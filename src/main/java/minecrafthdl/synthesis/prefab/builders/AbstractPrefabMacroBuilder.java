@@ -37,6 +37,33 @@ public abstract class AbstractPrefabMacroBuilder implements PrefabMacroBuilder {
         }
     }
 
+    protected static void requireInputCount(PrefabMacroGateFactory.Request request, String macro, int expected) {
+        if (request.inputCount != expected) {
+            throw new MHDLException(
+                    "Prefab macro input count mismatch for "
+                            + macro
+                            + ": expected "
+                            + expected
+                            + " got "
+                            + request.inputCount
+            );
+        }
+    }
+
+    protected static void requireSingleBitOutput(PrefabMacroGateFactory.Request request, String macro, String port) {
+        if (!port.equals(request.outputPort) || request.outputBit != 0) {
+            throw new MHDLException(
+                    "Unsupported output selection for "
+                            + macro
+                            + ": "
+                            + request.outputPort
+                            + "["
+                            + request.outputBit
+                            + "]"
+            );
+        }
+    }
+
     /**
      * Creates a simple shell gate with declared input pins and one output pin.
      * The shell is useful while implementing macro internals incrementally.

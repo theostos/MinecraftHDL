@@ -13,8 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Transition factory for mc_* macro gate synthesis.
- * Runtime path remains fallback while prefab implementations are rolled out.
+ * Factory for mc_* macro prefab gate synthesis.
  */
 public final class PrefabMacroGateFactory {
 
