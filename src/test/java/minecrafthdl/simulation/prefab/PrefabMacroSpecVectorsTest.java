@@ -1,6 +1,5 @@
 package minecrafthdl.simulation.prefab;
 
-import minecrafthdl.synthesis.macro.MacroRuntimeModel;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -15,7 +14,7 @@ class PrefabMacroSpecVectorsTest {
     @Test
     void timerVectorMatchesSpec() {
         PrefabMacroSimulator sim = new PrefabMacroSimulator(2);
-        MacroRuntimeModel.State state = new MacroRuntimeModel.State();
+        PrefabMacroModel.State state = new PrefabMacroModel.State();
         Map<String, Long> params = mapOf("TICKS", 3L);
 
         assertTrue(sim.tickOutput("mc_timer", "active", 0, params, in3(false, false, true), state));
@@ -30,7 +29,7 @@ class PrefabMacroSpecVectorsTest {
     @Test
     void periodicVectorMatchesSpecWithPulseWidthOneAutoPeriod() {
         PrefabMacroSimulator sim = new PrefabMacroSimulator(2);
-        MacroRuntimeModel.State state = new MacroRuntimeModel.State();
+        PrefabMacroModel.State state = new PrefabMacroModel.State();
         Map<String, Long> params = mapOf("PERIOD", 2L);
 
         assertFalse(sim.tickOutput("mc_periodic", "pulse", 0, params, in3(false, false, true), state));
@@ -43,7 +42,7 @@ class PrefabMacroSpecVectorsTest {
     @Test
     void latchVectorMatchesSetClearResetPriority() {
         PrefabMacroSimulator sim = new PrefabMacroSimulator(2);
-        MacroRuntimeModel.State state = new MacroRuntimeModel.State();
+        PrefabMacroModel.State state = new PrefabMacroModel.State();
         Map<String, Long> params = new HashMap<String, Long>();
 
         assertFalse(sim.tickOutput("mc_latch", "q", 0, params, in4(false, false, false, false), state));
@@ -59,7 +58,7 @@ class PrefabMacroSpecVectorsTest {
     @Test
     void counterVectorMatchesModuloAndClear() {
         PrefabMacroSimulator sim = new PrefabMacroSimulator(2);
-        MacroRuntimeModel.State state = new MacroRuntimeModel.State();
+        PrefabMacroModel.State state = new PrefabMacroModel.State();
         Map<String, Long> params = mapOf("WIDTH", 2L);
 
         sim.tickOutputs("mc_counter", params, in4(false, false, true, false), state,
@@ -82,7 +81,7 @@ class PrefabMacroSpecVectorsTest {
     @Test
     void seqLockVectorMatchesCorrectWrongAndProgress() {
         PrefabMacroSimulator sim = new PrefabMacroSimulator(2);
-        MacroRuntimeModel.State state = new MacroRuntimeModel.State();
+        PrefabMacroModel.State state = new PrefabMacroModel.State();
         Map<String, Long> params = new HashMap<String, Long>();
         params.put("BTN_COUNT", 3L);
         params.put("SEQ_LEN", 3L);
@@ -117,7 +116,7 @@ class PrefabMacroSpecVectorsTest {
     @Test
     void stationVectorMatchesDepartWindow() {
         PrefabMacroSimulator sim = new PrefabMacroSimulator(2);
-        MacroRuntimeModel.State state = new MacroRuntimeModel.State();
+        PrefabMacroModel.State state = new PrefabMacroModel.State();
         Map<String, Long> params = mapOf("DEPART_TICKS", 2L);
 
         LinkedHashMap<String, Boolean> arrival = sim.tickOutputs("mc_station_fsm", params, in5(false, false, false, true, false), state,

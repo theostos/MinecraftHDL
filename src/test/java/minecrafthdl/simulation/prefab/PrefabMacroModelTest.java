@@ -1,4 +1,4 @@
-package minecrafthdl.synthesis.macro;
+package minecrafthdl.simulation.prefab;
 
 import org.junit.jupiter.api.Test;
 
@@ -8,11 +8,11 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class MacroRuntimeModelTest {
+class PrefabMacroModelTest {
 
     @Test
     void timerHonorsTicksWindow() {
-        MacroRuntimeModel.State state = new MacroRuntimeModel.State();
+        PrefabMacroModel.State state = new PrefabMacroModel.State();
         Map<String, Long> params = mapOf("TICKS", 3L);
 
         // Trigger on first rising edge.
@@ -31,7 +31,7 @@ class MacroRuntimeModelTest {
 
     @Test
     void periodicPulsesEveryPeriod() {
-        MacroRuntimeModel.State state = new MacroRuntimeModel.State();
+        PrefabMacroModel.State state = new PrefabMacroModel.State();
         Map<String, Long> params = mapOf("PERIOD", 2L);
 
         // First enabled rising edge: no pulse.
@@ -44,7 +44,7 @@ class MacroRuntimeModelTest {
 
     @Test
     void counterIncrementsAndWrapsByWidth() {
-        MacroRuntimeModel.State state = new MacroRuntimeModel.State();
+        PrefabMacroModel.State state = new PrefabMacroModel.State();
         Map<String, Long> params = mapOf("WIDTH", 2L);
 
         // 4 increments in width=2 wraps to 0.
@@ -59,7 +59,7 @@ class MacroRuntimeModelTest {
 
     @Test
     void seqLockUsesExpectIdxAndEmitsCorrectPulse() {
-        MacroRuntimeModel.State state = new MacroRuntimeModel.State();
+        PrefabMacroModel.State state = new PrefabMacroModel.State();
         Map<String, Long> params = new HashMap<String, Long>();
         params.put("BTN_COUNT", 3L);
         params.put("SEQ_LEN", 3L);
@@ -74,15 +74,15 @@ class MacroRuntimeModelTest {
         // Final step 2
         tickSeqLockPulse(params, state, true, false, false, false, false, true);
 
-        assertTrue(MacroRuntimeModel.tick("mc_seq_lock", "correct_pulse", 0, params,
+        assertTrue(PrefabMacroModel.tick("mc_seq_lock", "correct_pulse", 0, params,
                 seqInputs(false, false, false, false, false, false), state));
-        assertTrue(MacroRuntimeModel.tick("mc_seq_lock", "unlocked", 0, params,
+        assertTrue(PrefabMacroModel.tick("mc_seq_lock", "unlocked", 0, params,
                 seqInputs(false, false, false, false, false, false), state));
     }
 
     @Test
     void stationFsmHoldsDepartNowForConfiguredTicks() {
-        MacroRuntimeModel.State state = new MacroRuntimeModel.State();
+        PrefabMacroModel.State state = new PrefabMacroModel.State();
         Map<String, Long> params = mapOf("DEPART_TICKS", 2L);
 
         // Arrival => OCCUPIED
@@ -102,7 +102,7 @@ class MacroRuntimeModelTest {
 
     @Test
     void timerRunsWithAutoClockEvenWhenClkInputStaysLow() {
-        MacroRuntimeModel.State state = new MacroRuntimeModel.State();
+        PrefabMacroModel.State state = new PrefabMacroModel.State();
         Map<String, Long> params = new HashMap<String, Long>();
         params.put("TICKS", 2L);
         params.put("AUTO_CLK", 1L);
@@ -117,7 +117,7 @@ class MacroRuntimeModelTest {
 
     @Test
     void seqLockTreatsHeldButtonAsSinglePulse() {
-        MacroRuntimeModel.State state = new MacroRuntimeModel.State();
+        PrefabMacroModel.State state = new PrefabMacroModel.State();
         Map<String, Long> params = new HashMap<String, Long>();
         params.put("BTN_COUNT", 3L);
         params.put("SEQ_LEN", 3L);
@@ -143,7 +143,7 @@ class MacroRuntimeModelTest {
 
     @Test
     void autoClockPeriodTicksControlsRisingEdgeCadence() {
-        MacroRuntimeModel.State state = new MacroRuntimeModel.State();
+        PrefabMacroModel.State state = new PrefabMacroModel.State();
         Map<String, Long> params = new HashMap<String, Long>();
         params.put("TICKS", 1L);
         params.put("AUTO_CLK", 1L);
@@ -158,34 +158,34 @@ class MacroRuntimeModelTest {
     }
 
     private static boolean tick(String macro, String outPort, int outBit, Map<String, Long> params,
-                                boolean i0, boolean i1, boolean i2, MacroRuntimeModel.State state) {
-        return MacroRuntimeModel.tick(macro, outPort, outBit, params, new boolean[]{i0, i1, i2}, state);
+                                boolean i0, boolean i1, boolean i2, PrefabMacroModel.State state) {
+        return PrefabMacroModel.tick(macro, outPort, outBit, params, new boolean[]{i0, i1, i2}, state);
     }
 
     private static boolean tick(String macro, String outPort, int outBit, Map<String, Long> params,
-                                boolean i0, boolean i1, boolean i2, boolean i3, MacroRuntimeModel.State state) {
-        return MacroRuntimeModel.tick(macro, outPort, outBit, params, new boolean[]{i0, i1, i2, i3}, state);
+                                boolean i0, boolean i1, boolean i2, boolean i3, PrefabMacroModel.State state) {
+        return PrefabMacroModel.tick(macro, outPort, outBit, params, new boolean[]{i0, i1, i2, i3}, state);
     }
 
     private static boolean tick(String macro, String outPort, int outBit, Map<String, Long> params,
-                                boolean i0, boolean i1, boolean i2, boolean i3, boolean i4, MacroRuntimeModel.State state) {
-        return MacroRuntimeModel.tick(macro, outPort, outBit, params, new boolean[]{i0, i1, i2, i3, i4}, state);
+                                boolean i0, boolean i1, boolean i2, boolean i3, boolean i4, PrefabMacroModel.State state) {
+        return PrefabMacroModel.tick(macro, outPort, outBit, params, new boolean[]{i0, i1, i2, i3, i4}, state);
     }
 
     private static boolean tick(String macro, String outPort, int outBit, Map<String, Long> params,
-                                boolean i0, boolean i1, boolean i2, boolean i3, boolean i4, boolean i5, MacroRuntimeModel.State state) {
-        return MacroRuntimeModel.tick(macro, outPort, outBit, params, new boolean[]{i0, i1, i2, i3, i4, i5}, state);
+                                boolean i0, boolean i1, boolean i2, boolean i3, boolean i4, boolean i5, PrefabMacroModel.State state) {
+        return PrefabMacroModel.tick(macro, outPort, outBit, params, new boolean[]{i0, i1, i2, i3, i4, i5}, state);
     }
 
-    private static void tickSeqLockPulse(Map<String, Long> params, MacroRuntimeModel.State state,
+    private static void tickSeqLockPulse(Map<String, Long> params, PrefabMacroModel.State state,
                                          boolean clkRise,
                                          boolean rst,
                                          boolean clear,
                                          boolean btn0,
                                          boolean btn1,
                                          boolean btn2) {
-        MacroRuntimeModel.tick("mc_seq_lock", "progress", 0, params, seqInputs(clkRise, rst, clear, btn0, btn1, btn2), state);
-        MacroRuntimeModel.tick("mc_seq_lock", "progress", 0, params, seqInputs(false, rst, clear, false, false, false), state);
+        PrefabMacroModel.tick("mc_seq_lock", "progress", 0, params, seqInputs(clkRise, rst, clear, btn0, btn1, btn2), state);
+        PrefabMacroModel.tick("mc_seq_lock", "progress", 0, params, seqInputs(false, rst, clear, false, false, false), state);
     }
 
     private static boolean[] seqInputs(boolean clk, boolean rst, boolean clear, boolean btn0, boolean btn1, boolean btn2) {

@@ -1,7 +1,5 @@
 package minecrafthdl.simulation.prefab;
 
-import minecrafthdl.synthesis.macro.MacroRuntimeModel;
-
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -24,13 +22,13 @@ public final class PrefabMacroSimulator {
             int outputBit,
             Map<String, Long> params,
             boolean[] rawInputs,
-            MacroRuntimeModel.State state
+            PrefabMacroModel.State state
     ) {
         boolean[] effectiveInputs = normalizedInputs(rawInputs);
         effectiveInputs[0] = internalClockLevel();
 
-        MacroRuntimeModel.step(macroName, params, effectiveInputs, state);
-        boolean out = MacroRuntimeModel.readOutput(macroName, outputPort, outputBit, state);
+        PrefabMacroModel.step(macroName, params, effectiveInputs, state);
+        boolean out = PrefabMacroModel.readOutput(macroName, outputPort, outputBit, state);
 
         this.gameTick++;
         return out;
@@ -40,18 +38,18 @@ public final class PrefabMacroSimulator {
             String macroName,
             Map<String, Long> params,
             boolean[] rawInputs,
-            MacroRuntimeModel.State state,
+            PrefabMacroModel.State state,
             OutputRef... outputs
     ) {
         boolean[] effectiveInputs = normalizedInputs(rawInputs);
         effectiveInputs[0] = internalClockLevel();
-        MacroRuntimeModel.step(macroName, params, effectiveInputs, state);
+        PrefabMacroModel.step(macroName, params, effectiveInputs, state);
 
         LinkedHashMap<String, Boolean> values = new LinkedHashMap<String, Boolean>();
         for (OutputRef output : outputs) {
             values.put(
                     output.label,
-                    MacroRuntimeModel.readOutput(macroName, output.port, output.bitIndex, state)
+                    PrefabMacroModel.readOutput(macroName, output.port, output.bitIndex, state)
             );
         }
 

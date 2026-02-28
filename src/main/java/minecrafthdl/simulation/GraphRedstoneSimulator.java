@@ -9,8 +9,8 @@ import MinecraftGraph.MuxVertex;
 import MinecraftGraph.Vertex;
 import MinecraftGraph.VertexType;
 import minecrafthdl.MHDLException;
+import minecrafthdl.simulation.prefab.PrefabMacroModel;
 import minecrafthdl.synthesis.macro.MacroInstanceGroups;
-import minecrafthdl.synthesis.macro.MacroRuntimeModel;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -32,7 +32,7 @@ public final class GraphRedstoneSimulator {
     private final LinkedHashMap<String, In_output> outputsByName = new LinkedHashMap<String, In_output>();
 
     private final LinkedHashMap<String, LinkedHashMap<String, Long>> macroParamsByInstance = new LinkedHashMap<String, LinkedHashMap<String, Long>>();
-    private final LinkedHashMap<String, MacroRuntimeModel.State> macroStateByInstance = new LinkedHashMap<String, MacroRuntimeModel.State>();
+    private final LinkedHashMap<String, PrefabMacroModel.State> macroStateByInstance = new LinkedHashMap<String, PrefabMacroModel.State>();
     private final IdentityHashMap<MacroVertex, String> macroInstanceByVertex = new IdentityHashMap<MacroVertex, String>();
 
     private final IdentityHashMap<Vertex, Boolean> lastVertexValues = new IdentityHashMap<Vertex, Boolean>();
@@ -97,7 +97,7 @@ public final class GraphRedstoneSimulator {
     }
 
     public void reset() {
-        for (MacroRuntimeModel.State state : this.macroStateByInstance.values()) {
+        for (PrefabMacroModel.State state : this.macroStateByInstance.values()) {
             state.resetAll();
         }
         this.lastVertexValues.clear();
@@ -133,7 +133,7 @@ public final class GraphRedstoneSimulator {
             }
 
             this.macroParamsByInstance.put(instanceName, params);
-            this.macroStateByInstance.put(instanceName, new MacroRuntimeModel.State());
+            this.macroStateByInstance.put(instanceName, new PrefabMacroModel.State());
 
             for (MacroVertex member : group.getMembers()) {
                 this.macroInstanceByVertex.put(member, instanceName);
@@ -234,7 +234,7 @@ public final class GraphRedstoneSimulator {
             throw new MHDLException("Macro instance not indexed for vertex: " + macroVertex.getID());
         }
 
-        MacroRuntimeModel.State state = this.macroStateByInstance.get(instanceName);
+        PrefabMacroModel.State state = this.macroStateByInstance.get(instanceName);
         if (state == null) {
             throw new MHDLException("Macro state missing for instance: " + instanceName);
         }
@@ -242,11 +242,11 @@ public final class GraphRedstoneSimulator {
         if (!steppedInstances.contains(instanceName)) {
             boolean[] macroInputs = resolveMacroInputs(macroVertex);
             Map<String, Long> params = this.macroParamsByInstance.get(instanceName);
-            MacroRuntimeModel.step(macroVertex.getMacroName(), params, macroInputs, state);
+            PrefabMacroModel.step(macroVertex.getMacroName(), params, macroInputs, state);
             steppedInstances.add(instanceName);
         }
 
-        return MacroRuntimeModel.readOutput(
+        return PrefabMacroModel.readOutput(
                 macroVertex.getMacroName(),
                 macroVertex.getOutputPort(),
                 macroVertex.getOutputBitIndex(),

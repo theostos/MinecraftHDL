@@ -1,11 +1,11 @@
-package minecrafthdl.synthesis.macro;
+package minecrafthdl.simulation.prefab;
 
 import java.util.Locale;
 import java.util.Map;
 
-public final class MacroRuntimeModel {
+public final class PrefabMacroModel {
 
-    private MacroRuntimeModel() {
+    private PrefabMacroModel() {
     }
 
     public static final class State {
