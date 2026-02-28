@@ -10,13 +10,14 @@ import java.util.HashMap;
 public class JCell extends Node{
 
     public String type;
+    public HashMap<String, String> parameters = new HashMap<String, String>();
     public HashMap<String, String> port_directions;
-    public HashMap<String, ArrayList<Integer>> connections;
+    public HashMap<String, ArrayList<Object>> connections;
 
     public HashMap<String, JPort> ports = new HashMap<String, JPort>();
 
     @Override
-    public ArrayList<Integer> getNets() {
+    public ArrayList<Object> getNets() {
         return null;
     }
 

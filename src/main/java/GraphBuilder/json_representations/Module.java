@@ -8,6 +8,7 @@ import java.util.HashMap;
 
 public class Module {
 
+    public HashMap<String, String> attributes;
     public HashMap<String, JPort> ports;
     public HashMap<String, JCell> cells;
 

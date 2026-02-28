@@ -4,9 +4,15 @@ import GraphBuilder.json_representations.JCell;
 import GraphBuilder.json_representations.JPort;
 import GraphBuilder.json_representations.JsonFile;
 import GraphBuilder.json_representations.Module;
-import MinecraftGraph.*;
+import MinecraftGraph.Function;
+import MinecraftGraph.FunctionType;
+import MinecraftGraph.Graph;
+import MinecraftGraph.In_output;
+import MinecraftGraph.MacroVertex;
+import MinecraftGraph.MuxVertex;
+import MinecraftGraph.Vertex;
+import MinecraftGraph.VertexType;
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import com.google.gson.stream.JsonReader;
 import minecrafthdl.MHDLException;
 
@@ -15,909 +21,763 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 
-
-//main class
-//json file->javaObject->Vertex->graph
 public class GraphBuilder {
-	private static ArrayList<String> ports_names=new ArrayList<String>();
-	private static ArrayList<String> cells_names=new ArrayList<String>();
-	private static ArrayList<Port> ports=new ArrayList<Port>();
-	private static ArrayList<Cell> cells=new ArrayList<Cell>();
-	
-	private static ArrayList<In_output> inputs=new ArrayList<In_output>();
-	private static ArrayList<In_output> outputs=new ArrayList<In_output>();
-	private static ArrayList<Function> gates=new ArrayList<Function>();
-
-	static int test_i = 1;
-
-	static int high_low_nets = Integer.MAX_VALUE;
-	static int cell_ids = 0;
-	static HashMap<Integer, Vertex> from_net = new HashMap<Integer, Vertex>();
-	static HashMap<Integer, ArrayList<Vertex>> to_net = new HashMap<Integer, ArrayList<Vertex>>();
-
-	public static int putInToNet(int i, Vertex v, Graph g){
-		ArrayList<Vertex> l = to_net.get(i);
-
-		if (i == 0) {
-			high_low_nets--;
-			Function f = new Function(cell_ids++, FunctionType.LOW, 0);
-			from_net.put(high_low_nets, f);
-			to_net.put(high_low_nets, new ArrayList<Vertex>());
-			to_net.get(high_low_nets).add(v);
-			g.addVertex(f);
-			return high_low_nets;
-		} else if (i == 1){
-			high_low_nets--;
-			Function f = new Function(cell_ids++, FunctionType.HIGH, 0);
-			from_net.put(high_low_nets, f);
-			to_net.put(high_low_nets, new ArrayList<Vertex>());
-			to_net.get(high_low_nets).add(v);
-			g.addVertex(f);
-			return high_low_nets;
-		} else {
-			if (l == null) to_net.put(i, new ArrayList<Vertex>());
-			to_net.get(i).add(v);
-			return i;
-		}
-
-	}
-
-	public static int putInFromNet(int i, Vertex v){
-		Vertex vr = from_net.get(i);
-
-		if (vr != null) throw new MHDLException("TWO OUTPUTS ON SAME NET");
-		from_net.put(i, v);
-		return i;
-	}
-
-	public static Graph buildGraph(String path){
-		high_low_nets = Integer.MAX_VALUE;
-
-		Gson gson= new com.google.gson.Gson();
-		JsonFile jf = null;
-		try {
-			FileReader fr = new FileReader(path);
-			JsonReader jreader = new JsonReader(fr);
-			jreader.setLenient(true);
-			jf = gson.fromJson(jreader, JsonFile.class);
-			fr.close();
-			jreader.close();
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
-		jf.postInit();
-
-		Graph g = new Graph();
-
-		Module m = jf.modules.values().iterator().next();
-
-		from_net = new HashMap<Integer, Vertex>();
-		to_net = new HashMap<Integer, ArrayList<Vertex>>();
-
-		for (String p_name : m.ports.keySet()){
-			JPort p = m.ports.get(p_name);
-
-			In_output io;
-
-			if (p.direction.equals("input")){
-
-				io = new In_output(p.bits.size(), VertexType.INPUT, p_name);
-
-				for (int i : p.bits){
-					putInFromNet(i, io);
-				}
-
-			} else {
-
-				io = new In_output(p.bits.size(), VertexType.OUTPUT, p_name);
-
-				for (int i : p.bits){
-					putInToNet(i, io, g);
-				}
-
-			}
-
-			g.addVertex(io);
-		}
-
-		cell_ids = 0;
-
-		for (String c_name : m.cells.keySet()){
-			JCell c = m.cells.get(c_name);
-
-			FunctionType f_type = resolveType(c.type);
-
-			Function f;
-
-			if (f_type == FunctionType.MUX){
-				f = new MuxVertex(cell_ids++, f_type, c.numInputs());
-			} else {
-				f = new Function(cell_ids++, f_type, c.numInputs());
-			}
-
-			for (String conn_name : c.connections.keySet()){
-				String direction = c.port_directions.get(conn_name);
-				ArrayList<Integer> conn_nets = c.connections.get(conn_name);
-
-				int conn_net = -1;
-
-				if (direction.equals("input")){
-					for (int i : conn_nets){
-						conn_net = putInToNet(i, f, g);
-					}
-				} else {
-					for (int i : conn_nets){
-						conn_net = putInFromNet(i, f);
-					}
-				}
-
-				if (f_type == FunctionType.MUX){
-					if (conn_name.equals("S")){
-						((MuxVertex) f).s_net_num = conn_net;
-					} else if (conn_name.equals(("A"))) {
-						((MuxVertex) f).a_net_num = conn_net;
-					} else if (conn_name.equals(("B"))) {
-						((MuxVertex) f).b_net_num = conn_net;
-					}
-				}
-			}
-
-			g.addVertex(f);
-		}
-
-		for (int i : to_net.keySet()){
-			for (Vertex v : to_net.get(i)){
-				Vertex from = from_net.get(i);
-				if (from == null){
-					throw new MHDLException("NET HAS NO FROM VERTEX");
-				}
-
-				if (v.type == VertexType.FUNCTION){
-					Function f = ((Function) v);
-					if (((Function) v).func_type == FunctionType.MUX){
-						MuxVertex mux = ((MuxVertex) f);
-
-						if (i == mux.a_net_num){
-							mux.a_vertex = from;
-						} else if (i == mux.b_net_num){
-							mux.b_vertex = from;
-						} else if (i == mux.s_net_num){
-							mux.s_vertex = from;
-						}
-					}
-				}
-
-				g.addEdge(from, v);
-			}
-		}
-
-		return g;
-	}
-
-
-	public static Graph buildxGraph(String path){
-
-		ArrayList<String> ports_names=new ArrayList<String>();
-		ArrayList<String> cells_names=new ArrayList<String>();
-		ArrayList<Port> ports=new ArrayList<Port>();
-		ArrayList<Cell> cells=new ArrayList<Cell>();
-
-		ArrayList<In_output> inputs=new ArrayList<In_output>();
-		ArrayList<In_output> outputs=new ArrayList<In_output>();
-		ArrayList<Function> gates=new ArrayList<Function>();
-
-		test_i = 1;
-		System.out.println(test_i++); //1
-
-
-		//create jsononjects
-		Gson gson= new com.google.gson.Gson();
-		JsonFile jf = null;
-		try {
-			FileReader fr = new FileReader(path);
-			JsonReader jreader = new JsonReader(fr);
-			jreader.setLenient(true);
-			jf = gson.fromJson(jreader, JsonFile.class);
-			fr.close();
-			jreader.close();
-		} catch (FileNotFoundException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
-		System.out.println(test_i++); //2
-
-
-		jf.postInit();
-
-		Module m = jf.modules.values().iterator().next();
-
-		if (m == null) return null;
-
-		//read all ports names and create port objects
-
-		for(String s: m.ports.keySet()){
-			JPort p = m.ports.get(s);
-			Port port=new Port(s, p.direction, p.bits);
-			ports.add(port);
-
-
-		}
-
-		System.out.println(test_i++); //3
-
-
-		int j=1;	//count to assign ids to gates
-
-		for(String s: m.cells.keySet()){
-
-			JCell c = m.cells.get(s);
-
-			ArrayList<Connection> conn_list = new ArrayList<Connection>();
-
-			for(JPort p : c.ports.values()){
-
-				conn_list.add(new Connection(p.direction, p.bits, p.name));
-
-
-
-			}
-
-
-
-			Cell cell=new Cell(j, c.type, conn_list );
-
-			cells.add(cell);
-			j++;
-		}
-
-		System.out.println(test_i++); //4
-
-		Graph graph=new Graph();
-
-		//add inputs to graph vertices
-		for(Port p: ports){
-			if(p.direction.equals("input")){
-				In_output in=new In_output(p.bits.size(), VertexType.INPUT, p.name);
-				inputs.add(in);
-				graph.addVertex(in);
-			}
-			else{
-				outputs.add(new In_output(p.bits.size(), VertexType.OUTPUT, p.name));
-			}
-
-
-		}
-
-		System.out.println(test_i++); //5
-
-
-		//add all cells
-		for(Cell c:cells){
-
-			Function v = null;
-
-			FunctionType type = resolveType((c.type));
-			if (type == FunctionType.MUX){
-				Connection c_sel = c.getConn("S");
-
-				if (c_sel == null) {
-					throw new MHDLException("MUX MUST HAVE S INPUT");
-				}
-
-				v = new MuxVertex(c.id, type, c.inputs.size());
-			} else {
-				v=new Function(c.id, resolveType(c.type), c.inputs.size());
-			}
-
-			gates.add(v);
-			graph.addVertex(v);
-		}
-
-		System.out.println(test_i++); //6
-
-
-		for(In_output v:outputs){
-			graph.addVertex(v);
-		}
-
-		System.out.println(test_i++); //7
-
-
-		//resolve connections
-		for(Port port:ports){
-
-			for(Port toCom:ports){
-				if(!port.equals(toCom)){
-					int conn_count=areConnected(port.bits, toCom.bits);
-					if(port.direction.equals("input")&&toCom.direction.equals("output")&&conn_count>0){
-						for(int h=0; h<conn_count;h++)
-							graph.addEdge(getVertex(graph, port), getVertex(graph, toCom));
-					}else if(port.direction.equals("output")&&toCom.direction.equals("input")&&conn_count>0){
-						for(int h=0; h<conn_count;h++)
-							graph.addEdge(getVertex(graph, toCom), getVertex(graph, port));
-
-					}
-				}
-
-			}
-
-		}
-
-		System.out.println(test_i++); //8
-
-
-		//add cells  edges
-		for(Cell cell:cells){
-
-			for(Port port:ports){
-
-				int c1=areConnected(port.bits, cell.inputs);
-				if(port.direction.equals("input")&& c1>0){
-					for(int h=0; h<c1;h++){
-
-						graph.addEdge(getVertex(graph, port), getVertex(graph, cell));
-
-					}
-
-				}
-
-				int c2=areConnected(port.bits, cell.outputs);
-
-				if(port.direction.equals("output")&&c2>0){
-
-					for(int h=0; h<c2;h++){
-						graph.addEdge(getVertex(graph, cell), getVertex(graph, port));
-
-					}
-				}
-
-			}
-
-			for(Cell c:cells){
-
-				if(!c.equals(cell)){
-					if(areConnected(cell.outputs, c.inputs)>0)
-						graph.addEdge(getVertex(graph, cell), getVertex(graph, c));
-				}
-
-			}
-
-		}
-
-
-		System.out.println(test_i++); //9
-
-		optimizeGraph(graph);
-		System.out.println(test_i++); //10
-
-		return graph;
-	}
-
-//	public static Graph buildxGraph(String path){
-//
-//		File file=new File(path);
-//		//Three string builder for the three json blocks: cells, ports, netnames
-//		StringBuilder sb1=new StringBuilder();
-//		StringBuilder sb2=new StringBuilder();
-//		StringBuilder sb3=new StringBuilder();
-//
-//		FileReader reader;
-//		BufferedReader b_r;
-//
-//		String portsBlock="";
-//		String cellsBlock="";
-//		String netnamesBlock="";
-//
-//		String pattern = "[:{\"\\s]";
-//
-//		try {
-//			reader = new FileReader(file);
-//			b_r=new BufferedReader(reader);
-//
-//			 //skip first four lines
-//			b_r.readLine();
-//			b_r.readLine();
-//			b_r.readLine();
-//			b_r.readLine();
-//
-//			int port_braces=1;
-//			String line=b_r.readLine();
-//
-//			sb1.append("{");
-//
-//			while(port_braces!=0){
-//				sb1.append(line);
-//				line=b_r.readLine();
-//
-//				if(line.contains("{")){
-//					ports_names.add(line.replaceAll(pattern, ""));
-//					port_braces++;
-//					}
-//				else if (line.contains("}")){port_braces--;}
-//			}
-//			sb1.append("}");
-//			sb1.append("}");
-//			portsBlock=sb1.toString();
-//
-//			//read gates block in the json file
-//			int cells_braces=1;
-//			line=b_r.readLine();
-//			sb2.append("{");
-//
-//			while(cells_braces!= 0){
-//
-//				sb2.append(line);
-//				line=b_r.readLine();
-//
-//				if(line.contains("{")){
-//					cells_braces++;
-//					if(cells_braces==2){
-//						cells_names.add(line.replace(": {", "").replaceAll("[\"\\s]", ""));
-//						}
-//					}
-//				else if (line.contains("}")){cells_braces--;}
-//
-//
-//
-//			}
-//
-//			sb2.append("}");
-//			sb2.append("}");
-//			cellsBlock=sb2.toString();
-//
-//
-//
-//		}catch (FileNotFoundException e) {
-//			e.printStackTrace();
-//		} catch (IOException f) {
-//			f.printStackTrace();
-//		}
-//
-//		//create jsononjects
-//		Gson gson= new com.google.gson.Gson();
-//		System.out.println(portsBlock);
-//
-//		JsonObject ports_obj=gson.fromJson(portsBlock, JsonElement.class).getAsJsonObject().get("ports").getAsJsonObject();
-//
-//
-//
-//		//read all ports names and create port objects
-//
-//		for(String s: ports_names){
-//			JsonObject js=ports_obj.get(s).getAsJsonObject();
-//			Port port=new Port(s, js.get("direction").getAsString(), js.get("bits").getAsJsonArray());
-//			ports.add(port);
-//
-//
-//		}
-//
-//		JsonObject cells_obj=gson.fromJson(cellsBlock, JsonElement.class).getAsJsonObject().get("cells").getAsJsonObject();
-//
-//
-//		int j=1;	//count to assign ids to gates
-//
-//		for(String c: cells_names){
-//
-//			JsonObject js_c=cells_obj.get(c).getAsJsonObject();
-//			JsonObject param_obj=js_c.get("parameters").getAsJsonObject();
-//			JsonObject conn_obj=js_c.get("connections").getAsJsonObject();
-//			JsonObject dir_obj=js_c.get("port_directions").getAsJsonObject();
-//
-//
-//			String[] param=param_obj.toString().replaceAll("[{]", "").split(",");
-//			String[] port_dir=conn_obj.toString().replaceAll("[{]", "").split(",");
-//			String[] conn=dir_obj.toString().replaceAll("[{]", "").split(",");
-//			ArrayList<Connection> conn_list=new ArrayList<>();
-//
-//			for(int k=0; k<port_dir.length;k++){
-//
-//				String holder=port_dir[k].split(":")[0].replaceAll("[\"]", "");
-//				String dir=dir_obj.get(holder).getAsString();
-//				JsonArray n=conn_obj.get(holder).getAsJsonArray();
-//
-//				conn_list.add(new Connection(dir, n));
-//
-//
-//
-//			}
-//
-//
-//
-//			Cell cell=new Cell(j,js_c.get("type").getAsString(),conn_list );
-//
-//			cells.add(cell);
-//			j++;
-//		}
-//
-//		Graph graph=new Graph();
-//
-//		//add inputs to graph vertices
-//		for(Port p: ports){
-//			if(p.direction.equals("input")){
-//				In_output in=new In_output(p.bits.size(), VertexType.INPUT, p.name);
-//				inputs.add(in);
-//				graph.addVertex(in);
-//			}
-//			else{
-//				outputs.add(new In_output(p.bits.size(), VertexType.OUTPUT, p.name));
-//			}
-//
-//
-//		}
-//		//add all cells
-//		for(Cell c:cells){
-//
-//			Function v=new Function(c.id, VertexType.FUNCTION, resolveType(c.type), c.inputs.size());
-//			gates.add(v);
-//			graph.addVertex(v);
-//		}
-//
-//
-//		for(In_output v:outputs){
-//			graph.addVertex(v);
-//		}
-//
-//
-//		//resolve connections
-//		for(Port port:ports){
-//
-//			for(Port toCom:ports){
-//				if(!port.equals(toCom)){
-//					int conn_count=areConnected(port.bits, toCom.bits);
-//					if(port.direction.equals("input")&&toCom.direction.equals("output")&&conn_count>0){
-//						for(int h=0; h<conn_count;h++)
-//							graph.addEdge(getVertex(graph, port), getVertex(graph, toCom));
-//					}else if(port.direction.equals("output")&&toCom.direction.equals("input")&&conn_count>0){
-//						for(int h=0; h<conn_count;h++)
-//							graph.addEdge(getVertex(graph, toCom), getVertex(graph, port));
-//
-//					}
-//				}
-//
-//			}
-//
-//		}
-//
-//		//add cells  edges
-//		for(Cell cell:cells){
-//			for(Port port:ports){
-//				int c1=areConnected(port.bits, cell.inputs);
-//				if(port.direction.equals("input")&& c1>0){
-//					for(int h=0; h<c1;h++)
-//
-//						graph.addEdge(getVertex(graph, port), getVertex(graph, cell));
-//				}
-//
-//				int c2=areConnected(port.bits, cell.outputs);
-//
-//				if(port.direction.equals("output")&&c2>0){
-//
-//					for(int h=0; h<c2;h++)
-//						graph.addEdge(getVertex(graph, cell), getVertex(graph, port));
-//				}
-//
-//			}
-//
-//			for(Cell c:cells){
-//
-//				if(!c.equals(cell)){
-//					if(areConnected(cell.outputs, c.inputs)>0)
-//						graph.addEdge(getVertex(graph, cell), getVertex(graph, c));
-//				}
-//
-//			}
-//
-//		}
-//
-//		optimizeGraph(graph);
-//		return graph;
-//	}
-//
-	private static void optimizeGraph(Graph graph){
-		//iterate through all the nodes of the graph
-		//if or or and gate check outputs
-		//if all outputs are of the same type
-		//remove lower level and reconnect its inputs with the higher level
-		//got back
-		ArrayList<Vertex> verToRemove=new ArrayList<Vertex>();
-		for(Vertex v: graph.getVertices()){
-			System.out.println("vertex for");
-
-			//check if vertex is a gate
-			if(v.getType()==VertexType.FUNCTION){
-				//check if gate type is and, or
-				Function f=(Function)v;
-				
-				FunctionType f_t=f.getFunc_Type();
-				if(f_t==FunctionType.AND||f_t==FunctionType.OR){
-					if(canMerge(f)){
-						for(Vertex s:f.getNext()){
-							System.out.println("vertex inner for");
-
-							graph.mergeVertices(f, s);
-							verToRemove.add(f);
-						}
-
-					}
-					
-				}	
-			}		
-			
-		}
-		
-		for(Vertex t:verToRemove){
-			System.out.println("vertex inner 2 for");
-
-			graph.removeVertex(t);
-		}
-	}
-
-	private static boolean canMerge(Function v){
-		for(Vertex x:v.getNext()){
-			if(x.getType()!=VertexType.FUNCTION){
-				return false;
-				
-			}
-			Function f=(Function)x;
-			if(f.getFunc_Type()!=v.getFunc_Type()){
-				return false;
-			}	
-		}
-		
-		return true;
-		
-	}
-	
-	
-	//getting vertices
-	
-	private static Vertex getVertex(Graph g, Port p){
-	
-		for(Vertex v:g.getVertices()){
-			
-			if(v.getID().equals(p.name)){
-				return v;
-			}
-			
-		}
-		return null;
-		
-	}
-	
-	private static Vertex getVertex(Graph g, Cell p){
-		
-		for(Vertex v:g.getVertices()){
-			
-			if(v.getID().equals(String.valueOf(p.id))){
-				return v;
-			}
-			
-		}
-		return null;
-		
-	}
-	
-	//checks if signals, gates are connected
-	private static int areConnected(ArrayList<Integer> bits, ArrayList<Integer> inputs2){
-		
-		int count=0; 
-		
-		for(Integer x: bits){
-			for(Integer y: inputs2){
-				if(x==y){
-					count++;
-				}
-					
-			}
-			
-		}
-		return count;
-		
-	
-	}
-	
-
-	
-	
-	private static int num_of_inputs(JsonObject j_o){
-		int num=0;
-		char[] connection=j_o.get("connections").toString().toCharArray();
-		for(char c: connection){
-			if(c==':') num++;
-		}
-		return num-1;
-	}
-	
-	
-	
-	
-	private static FunctionType resolveType(String type){
-		
-		//make sure that all string included
-		
-		if(type.contains("and")||type.contains("AND")){
-			return FunctionType.AND;
-			
-		}else if(type.contains("MUX")||type.contains("mux")){
-			return FunctionType.MUX;
-		}else if(type.contains("XOR")||type.contains("xor")){
-			return FunctionType.XOR;
-
-		}else if(type.contains("or")||type.contains("OR")){
-			return FunctionType.OR;
-			
-		}else if(type.contains("dlatch_p")||type.contains("DLATCH_P")) {
-			return FunctionType.D_LATCH;
-
-		}else if(type.contains("not")||type.contains("NOT")){
-				return FunctionType.INV;
-
-		}else{
-			throw new MHDLException("Unknown Cell:" + type);
-		}
-		
-		
-		
-	}
-
+    private static int highLowNets = Integer.MAX_VALUE;
+    private static int generatedNetId = -1;
+    private static int cellIds = 0;
+
+    private static final int MAX_TIMER_TICKS = 1200;
+    private static final int MAX_PERIOD_TICKS = 1200;
+    private static final int MAX_COUNTER_WIDTH = 16;
+    private static final int MAX_BTN_COUNT = 8;
+    private static final int MAX_SEQ_LEN = 16;
+    private static final int MAX_DEPART_TICKS = 1200;
+
+    private static HashMap<Integer, Vertex> fromNet = new HashMap<Integer, Vertex>();
+    private static HashMap<Integer, ArrayList<Vertex>> toNet = new HashMap<Integer, ArrayList<Vertex>>();
+
+    private enum CellKind {
+        AND,
+        OR,
+        XOR,
+        INV,
+        MUX,
+        RELAY,
+        NAND,
+        NOR,
+        XNOR,
+        BUF,
+        MC_TIMER,
+        MC_PERIODIC,
+        MC_LATCH,
+        MC_COUNTER,
+        MC_SEQ_LOCK,
+        MC_STATION_FSM
+    }
+
+    private static final class MacroOutput {
+        final String port;
+        final int bitIndex;
+        final int netId;
+
+        MacroOutput(String port, int bitIndex, int netId) {
+            this.port = port;
+            this.bitIndex = bitIndex;
+            this.netId = netId;
+        }
+    }
+
+    public static Graph buildGraph(String path) {
+        highLowNets = Integer.MAX_VALUE;
+        generatedNetId = -1;
+        cellIds = 0;
+
+        JsonFile jsonFile = parseJson(path);
+        Module module = selectTopModule(jsonFile);
+
+        fromNet = new HashMap<Integer, Vertex>();
+        toNet = new HashMap<Integer, ArrayList<Vertex>>();
+
+        Graph graph = new Graph();
+
+        for (String portName : module.ports.keySet()) {
+            JPort port = module.ports.get(portName);
+            In_output io;
+
+            if ("input".equals(port.direction)) {
+                io = new In_output(port.bits.size(), VertexType.INPUT, portName);
+                for (Object bitToken : port.bits) {
+                    putInFromNet(toNetId(bitToken), io);
+                }
+            } else if ("output".equals(port.direction)) {
+                io = new In_output(port.bits.size(), VertexType.OUTPUT, portName);
+                for (Object bitToken : port.bits) {
+                    putInToNet(toNetId(bitToken), io, graph);
+                }
+            } else {
+                throw new MHDLException("Unsupported port direction: " + port.direction);
+            }
+
+            graph.addVertex(io);
+        }
+
+        for (String cellName : module.cells.keySet()) {
+            JCell cell = module.cells.get(cellName);
+            addCell(graph, cell);
+        }
+
+        connectNets(graph);
+        return graph;
+    }
+
+    private static JsonFile parseJson(String path) {
+        Gson gson = new Gson();
+        try (FileReader fr = new FileReader(path); JsonReader reader = new JsonReader(fr)) {
+            reader.setLenient(true);
+            JsonFile jsonFile = gson.fromJson(reader, JsonFile.class);
+            if (jsonFile == null || jsonFile.modules == null || jsonFile.modules.isEmpty()) {
+                throw new MHDLException("Invalid or empty JSON netlist: " + path);
+            }
+            jsonFile.postInit();
+            return jsonFile;
+        } catch (FileNotFoundException e) {
+            throw new MHDLException("Netlist file not found: " + path);
+        } catch (IOException e) {
+            throw new MHDLException("Could not read netlist: " + path);
+        }
+    }
+
+    private static Module selectTopModule(JsonFile jsonFile) {
+        if (jsonFile.modules.size() == 1) {
+            return jsonFile.modules.values().iterator().next();
+        }
+
+        for (Map.Entry<String, Module> entry : jsonFile.modules.entrySet()) {
+            Module module = entry.getValue();
+            if (module != null && module.attributes != null) {
+                String topFlag = module.attributes.get("top");
+                if (topFlag != null && topFlag.replace("0", "").length() > 0) {
+                    return module;
+                }
+            }
+        }
+
+        Module namedTop = jsonFile.modules.get("top");
+        if (namedTop != null) {
+            return namedTop;
+        }
+
+        for (Map.Entry<String, Module> entry : jsonFile.modules.entrySet()) {
+            if (!normalize(entry.getKey()).startsWith("$PARAMOD")) {
+                return entry.getValue();
+            }
+        }
+
+        throw new MHDLException("Could not determine top module. Ensure Yosys hierarchy marks a top module.");
+    }
+
+    private static void addCell(Graph graph, JCell cell) {
+        CellKind kind = resolveKind(cell.type);
+
+        switch (kind) {
+            case AND:
+                addSimpleCell(graph, cell, FunctionType.AND);
+                break;
+            case OR:
+                addSimpleCell(graph, cell, FunctionType.OR);
+                break;
+            case XOR:
+                addSimpleCell(graph, cell, FunctionType.XOR);
+                break;
+            case INV:
+                addSimpleCell(graph, cell, FunctionType.INV);
+                break;
+            case RELAY:
+            case BUF:
+                addSimpleCell(graph, cell, FunctionType.RELAY);
+                break;
+            case MUX:
+                addMuxCell(graph, cell);
+                break;
+            case NAND:
+                addNandCell(graph, cell);
+                break;
+            case NOR:
+                addNorCell(graph, cell);
+                break;
+            case XNOR:
+                addXnorCell(graph, cell);
+                break;
+            case MC_TIMER:
+                addMcTimerCell(graph, cell);
+                break;
+            case MC_PERIODIC:
+                addMcPeriodicCell(graph, cell);
+                break;
+            case MC_LATCH:
+                addMcLatchCell(graph, cell);
+                break;
+            case MC_COUNTER:
+                addMcCounterCell(graph, cell);
+                break;
+            case MC_SEQ_LOCK:
+                addMcSeqLockCell(graph, cell);
+                break;
+            case MC_STATION_FSM:
+                addMcStationFsmCell(graph, cell);
+                break;
+            default:
+                throw new MHDLException("Unsupported cell type: " + cell.type);
+        }
+    }
+
+    private static void addSimpleCell(Graph graph, JCell cell, FunctionType functionType) {
+        Function function = new Function(nextCellId(), functionType, countInputBits(cell));
+        wireCellPorts(graph, cell, function);
+        graph.addVertex(function);
+    }
+
+    private static void addMuxCell(Graph graph, JCell cell) {
+        int aNet = requireSingleNet(cell, "A");
+        int bNet = requireSingleNet(cell, "B");
+        int sNet = requireSingleNet(cell, "S");
+
+        MuxVertex mux = new MuxVertex(nextCellId(), FunctionType.MUX, 3);
+        mux.a_net_num = aNet;
+        mux.b_net_num = bNet;
+        mux.s_net_num = sNet;
+
+        putInToNet(aNet, mux, graph);
+        putInToNet(bNet, mux, graph);
+        putInToNet(sNet, mux, graph);
+
+        int yNet = requireSingleNet(cell, "Y", "Q");
+        putInFromNet(yNet, mux);
+
+        graph.addVertex(mux);
+    }
+
+    private static void addNandCell(Graph graph, JCell cell) {
+        int outNet = requireSingleNet(cell, "Y", "Q");
+        int internalNet = nextGeneratedNet();
+
+        Function andGate = new Function(nextCellId(), FunctionType.AND, countInputBits(cell));
+        Function invGate = new Function(nextCellId(), FunctionType.INV, 1);
+
+        wireOnlyInputs(graph, cell, andGate);
+        putInFromNet(internalNet, andGate);
+
+        putInToNet(internalNet, invGate, graph);
+        putInFromNet(outNet, invGate);
+
+        graph.addVertex(andGate);
+        graph.addVertex(invGate);
+    }
+
+    private static void addNorCell(Graph graph, JCell cell) {
+        int outNet = requireSingleNet(cell, "Y", "Q");
+        int internalNet = nextGeneratedNet();
+
+        Function orGate = new Function(nextCellId(), FunctionType.OR, countInputBits(cell));
+        Function invGate = new Function(nextCellId(), FunctionType.INV, 1);
+
+        wireOnlyInputs(graph, cell, orGate);
+        putInFromNet(internalNet, orGate);
+
+        putInToNet(internalNet, invGate, graph);
+        putInFromNet(outNet, invGate);
+
+        graph.addVertex(orGate);
+        graph.addVertex(invGate);
+    }
+
+    private static void addXnorCell(Graph graph, JCell cell) {
+        int outNet = requireSingleNet(cell, "Y", "Q");
+        int internalNet = nextGeneratedNet();
+
+        Function xorGate = new Function(nextCellId(), FunctionType.XOR, countInputBits(cell));
+        Function invGate = new Function(nextCellId(), FunctionType.INV, 1);
+
+        wireOnlyInputs(graph, cell, xorGate);
+        putInFromNet(internalNet, xorGate);
+
+        putInToNet(internalNet, invGate, graph);
+        putInFromNet(outNet, invGate);
+
+        graph.addVertex(xorGate);
+        graph.addVertex(invGate);
+    }
+
+    private static void addMcTimerCell(Graph graph, JCell cell) {
+        int ticks = parseParameter(cell, "TICKS", 60, 1, MAX_TIMER_TICKS);
+
+        HashMap<String, Integer> params = new HashMap<String, Integer>();
+        params.put("TICKS", ticks);
+
+        ArrayList<Integer> inputNets = orderedSingleBitInputs(cell, "clk", "rst", "trigger_pulse");
+        ArrayList<MacroOutput> outputs = singleBitOutputs(cell, "active");
+
+        addMacroVertices(graph, FunctionType.MC_TIMER, "mc_timer", params, inputNets, outputs);
+    }
+
+    private static void addMcPeriodicCell(Graph graph, JCell cell) {
+        int period = parseParameter(cell, "PERIOD", 20, 1, MAX_PERIOD_TICKS);
+
+        HashMap<String, Integer> params = new HashMap<String, Integer>();
+        params.put("PERIOD", period);
+
+        ArrayList<Integer> inputNets = orderedSingleBitInputs(cell, "clk", "rst", "enable");
+        ArrayList<MacroOutput> outputs = singleBitOutputs(cell, "pulse");
+
+        addMacroVertices(graph, FunctionType.MC_PERIODIC, "mc_periodic", params, inputNets, outputs);
+    }
+
+    private static void addMcLatchCell(Graph graph, JCell cell) {
+        HashMap<String, Integer> params = new HashMap<String, Integer>();
+
+        ArrayList<Integer> inputNets = orderedSingleBitInputs(cell, "clk", "rst", "set_pulse", "clear_pulse");
+        ArrayList<MacroOutput> outputs = singleBitOutputs(cell, "q");
+
+        addMacroVertices(graph, FunctionType.MC_LATCH, "mc_latch", params, inputNets, outputs);
+    }
+
+    private static void addMcCounterCell(Graph graph, JCell cell) {
+        int width = parseParameter(cell, "WIDTH", 8, 1, MAX_COUNTER_WIDTH);
+
+        HashMap<String, Integer> params = new HashMap<String, Integer>();
+        params.put("WIDTH", width);
+
+        ArrayList<Integer> inputNets = orderedSingleBitInputs(cell, "clk", "rst", "inc_pulse", "clear_pulse");
+        ArrayList<MacroOutput> outputs = vectorOutputs(cell, "count", width);
+
+        addMacroVertices(graph, FunctionType.MC_COUNTER, "mc_counter", params, inputNets, outputs);
+    }
+
+    private static void addMcSeqLockCell(Graph graph, JCell cell) {
+        int btnCount = parseParameter(cell, "BTN_COUNT", 3, 1, MAX_BTN_COUNT);
+        int seqLen = parseParameter(cell, "SEQ_LEN", 3, 1, MAX_SEQ_LEN);
+        int latchSuccess = parseParameter(cell, "LATCH_SUCCESS", 1, 0, 1);
+
+        HashMap<String, Integer> params = new HashMap<String, Integer>();
+        params.put("BTN_COUNT", btnCount);
+        params.put("SEQ_LEN", seqLen);
+        params.put("LATCH_SUCCESS", latchSuccess);
+
+        ArrayList<Integer> inputNets = orderedSingleBitInputs(cell, "clk", "rst", "clear");
+        inputNets.addAll(vectorInput(cell, "btn_pulse", btnCount));
+
+        ArrayList<MacroOutput> outputs = new ArrayList<MacroOutput>();
+        outputs.addAll(singleBitOutputs(cell, "unlocked"));
+        outputs.addAll(singleBitOutputs(cell, "correct_pulse"));
+        outputs.addAll(singleBitOutputs(cell, "wrong_pulse"));
+
+        int progressWidth = ceilLog2(seqLen + 1);
+        outputs.addAll(vectorOutputs(cell, "progress", progressWidth));
+
+        addMacroVertices(graph, FunctionType.MC_SEQ_LOCK, "mc_seq_lock", params, inputNets, outputs);
+    }
+
+    private static void addMcStationFsmCell(Graph graph, JCell cell) {
+        int departTicks = parseParameter(cell, "DEPART_TICKS", 20, 1, MAX_DEPART_TICKS);
+
+        HashMap<String, Integer> params = new HashMap<String, Integer>();
+        params.put("DEPART_TICKS", departTicks);
+
+        ArrayList<Integer> inputNets = orderedSingleBitInputs(cell, "clk", "rst", "clear", "arrival_pulse", "depart_pulse");
+
+        ArrayList<MacroOutput> outputs = new ArrayList<MacroOutput>();
+        outputs.addAll(singleBitOutputs(cell, "occupied"));
+        outputs.addAll(singleBitOutputs(cell, "depart_now"));
+
+        addMacroVertices(graph, FunctionType.MC_STATION_FSM, "mc_station_fsm", params, inputNets, outputs);
+    }
+
+    private static void addMacroVertices(Graph graph, FunctionType type, String macroName, Map<String, Integer> params, ArrayList<Integer> inputNets, ArrayList<MacroOutput> outputs) {
+        if (outputs.isEmpty()) {
+            throw new MHDLException("Macro " + macroName + " has no outputs");
+        }
+
+        for (MacroOutput out : outputs) {
+            MacroVertex macroVertex = new MacroVertex(nextCellId(), type, inputNets.size(), macroName, out.port, out.bitIndex, params);
+
+            for (int inNet : inputNets) {
+                putInToNet(inNet, macroVertex, graph);
+            }
+
+            putInFromNet(out.netId, macroVertex);
+            graph.addVertex(macroVertex);
+        }
+    }
+
+    private static ArrayList<Integer> orderedSingleBitInputs(JCell cell, String... names) {
+        ArrayList<Integer> nets = new ArrayList<Integer>();
+        for (String name : names) {
+            nets.add(requireSingleNet(cell, name));
+        }
+        return nets;
+    }
+
+    private static ArrayList<Integer> vectorInput(JCell cell, String name, int expectedWidth) {
+        ArrayList<Object> bits = requireBits(cell, name);
+        if (bits.size() != expectedWidth) {
+            throw new MHDLException("Macro input " + name + " width mismatch. Expected " + expectedWidth + " got " + bits.size());
+        }
+        ArrayList<Integer> nets = new ArrayList<Integer>();
+        for (Object bit : bits) {
+            nets.add(toNetId(bit));
+        }
+        return nets;
+    }
+
+    private static ArrayList<MacroOutput> singleBitOutputs(JCell cell, String name) {
+        ArrayList<Object> bits = requireBits(cell, name);
+        if (bits.size() != 1) {
+            throw new MHDLException("Macro output " + name + " must be 1-bit");
+        }
+
+        ArrayList<MacroOutput> outputs = new ArrayList<MacroOutput>();
+        outputs.add(new MacroOutput(name, 0, toNetId(bits.get(0))));
+        return outputs;
+    }
+
+    private static ArrayList<MacroOutput> vectorOutputs(JCell cell, String name, int expectedWidth) {
+        ArrayList<Object> bits = requireBits(cell, name);
+        if (bits.size() != expectedWidth) {
+            throw new MHDLException("Macro output " + name + " width mismatch. Expected " + expectedWidth + " got " + bits.size());
+        }
+
+        ArrayList<MacroOutput> outputs = new ArrayList<MacroOutput>();
+        for (int i = 0; i < bits.size(); i++) {
+            outputs.add(new MacroOutput(name, i, toNetId(bits.get(i))));
+        }
+        return outputs;
+    }
+
+    private static ArrayList<Object> requireBits(JCell cell, String portName) {
+        ArrayList<Object> bits = cell.connections.get(portName);
+        if (bits == null || bits.isEmpty()) {
+            throw new MHDLException("Cell " + cell.type + " missing required port " + portName);
+        }
+        return bits;
+    }
+
+    private static int parseParameter(JCell cell, String key, int defaultValue, int minInclusive, int maxInclusive) {
+        int value = defaultValue;
+
+        if (cell.parameters != null && cell.parameters.containsKey(key)) {
+            value = parseBinaryLiteral(cell.parameters.get(key));
+        }
+
+        Integer fromType = parseParameterFromType(cell.type, key);
+        if (fromType != null) {
+            value = fromType;
+        }
+
+        if (value < minInclusive || value > maxInclusive) {
+            throw new MHDLException("Macro parameter " + key + " out of bounds: " + value
+                    + " (allowed " + minInclusive + ".." + maxInclusive + ")");
+        }
+
+        return value;
+    }
+
+    private static Integer parseParameterFromType(String cellType, String key) {
+        String type = normalize(cellType);
+        String token = normalize(key) + "=S";
+
+        int idx = type.indexOf(token);
+        if (idx < 0) {
+            return null;
+        }
+
+        int quote = type.indexOf('\'', idx);
+        if (quote < 0 || quote + 1 >= type.length()) {
+            return null;
+        }
+
+        int end = quote + 1;
+        while (end < type.length()) {
+            char c = type.charAt(end);
+            if (c != '0' && c != '1') {
+                break;
+            }
+            end++;
+        }
+
+        if (end == quote + 1) {
+            return null;
+        }
+
+        return parseBinaryLiteral(type.substring(quote + 1, end));
+    }
+
+    private static int parseBinaryLiteral(String literal) {
+        if (literal == null) {
+            throw new MHDLException("Null parameter literal");
+        }
+
+        String raw = literal.trim();
+        int quoteIndex = raw.indexOf('\'');
+        String bits = (quoteIndex >= 0 && quoteIndex + 1 < raw.length()) ? raw.substring(quoteIndex + 1) : raw;
+        bits = bits.replace("_", "");
+
+        if (bits.isEmpty()) {
+            throw new MHDLException("Invalid parameter literal: " + literal);
+        }
+
+        int value = 0;
+        for (int i = 0; i < bits.length(); i++) {
+            char c = bits.charAt(i);
+            value <<= 1;
+            if (c == '1') {
+                value |= 1;
+            } else if (c == '0') {
+                // noop
+            } else {
+                throw new MHDLException("Unsupported parameter bit in literal: " + literal);
+            }
+        }
+
+        return value;
+    }
+
+    private static int ceilLog2(int x) {
+        int v = 0;
+        int n = Math.max(1, x - 1);
+        while (n > 0) {
+            n >>= 1;
+            v++;
+        }
+        return Math.max(1, v);
+    }
+
+    private static void wireCellPorts(Graph graph, JCell cell, Function function) {
+        for (String connName : cell.connections.keySet()) {
+            String direction = cell.port_directions.get(connName);
+            ArrayList<Object> connNets = cell.connections.get(connName);
+
+            if ("input".equals(direction)) {
+                for (Object bitToken : connNets) {
+                    int net = putInToNet(toNetId(bitToken), function, graph);
+                    if (function.func_type == FunctionType.MUX && function instanceof MuxVertex) {
+                        if ("S".equals(connName)) {
+                            ((MuxVertex) function).s_net_num = net;
+                        } else if ("A".equals(connName)) {
+                            ((MuxVertex) function).a_net_num = net;
+                        } else if ("B".equals(connName)) {
+                            ((MuxVertex) function).b_net_num = net;
+                        }
+                    }
+                }
+            } else if ("output".equals(direction)) {
+                for (Object bitToken : connNets) {
+                    putInFromNet(toNetId(bitToken), function);
+                }
+            } else {
+                throw new MHDLException("Unknown cell connection direction: " + direction);
+            }
+        }
+    }
+
+    private static void wireOnlyInputs(Graph graph, JCell cell, Function function) {
+        for (String connName : cell.connections.keySet()) {
+            String direction = cell.port_directions.get(connName);
+            if (!"input".equals(direction)) {
+                continue;
+            }
+            for (Object bitToken : cell.connections.get(connName)) {
+                putInToNet(toNetId(bitToken), function, graph);
+            }
+        }
+    }
+
+    private static int countInputBits(JCell cell) {
+        int count = 0;
+        for (String connName : cell.port_directions.keySet()) {
+            if ("input".equals(cell.port_directions.get(connName))) {
+                count += cell.connections.get(connName).size();
+            }
+        }
+        return Math.max(1, count);
+    }
+
+    private static int requireSingleNet(JCell cell, String... candidateNames) {
+        for (String name : candidateNames) {
+            ArrayList<Object> bits = cell.connections.get(name);
+            if (bits == null || bits.isEmpty()) {
+                continue;
+            }
+            if (bits.size() != 1) {
+                throw new MHDLException("Cell " + cell.type + " port " + name + " must be 1-bit");
+            }
+            return toNetId(bits.get(0));
+        }
+
+        StringBuilder names = new StringBuilder();
+        for (int i = 0; i < candidateNames.length; i++) {
+            if (i > 0) {
+                names.append("/");
+            }
+            names.append(candidateNames[i]);
+        }
+        throw new MHDLException("Cell " + cell.type + " missing required port " + names);
+    }
+
+    private static void connectNets(Graph graph) {
+        for (int net : toNet.keySet()) {
+            Vertex from = fromNet.get(net);
+            if (from == null) {
+                throw new MHDLException("Net " + net + " has no driver vertex");
+            }
+
+            for (Vertex to : toNet.get(net)) {
+                if (to.type == VertexType.FUNCTION) {
+                    Function function = (Function) to;
+                    if (function.func_type == FunctionType.MUX && function instanceof MuxVertex) {
+                        MuxVertex mux = (MuxVertex) function;
+                        if (net == mux.a_net_num) {
+                            mux.a_vertex = from;
+                        } else if (net == mux.b_net_num) {
+                            mux.b_vertex = from;
+                        } else if (net == mux.s_net_num) {
+                            mux.s_vertex = from;
+                        }
+                    }
+                }
+
+                graph.addEdge(from, to);
+            }
+        }
+    }
+
+    private static CellKind resolveKind(String type) {
+        String normalized = normalize(type);
+
+        if (containsMacro(normalized, "mc_timer")) {
+            return CellKind.MC_TIMER;
+        }
+        if (containsMacro(normalized, "mc_periodic")) {
+            return CellKind.MC_PERIODIC;
+        }
+        if (containsMacro(normalized, "mc_latch")) {
+            return CellKind.MC_LATCH;
+        }
+        if (containsMacro(normalized, "mc_counter")) {
+            return CellKind.MC_COUNTER;
+        }
+        if (containsMacro(normalized, "mc_seq_lock")) {
+            return CellKind.MC_SEQ_LOCK;
+        }
+        if (containsMacro(normalized, "mc_station_fsm")) {
+            return CellKind.MC_STATION_FSM;
+        }
+
+        if (isNonWhitelistedSequentialCell(normalized)) {
+            throw new MHDLException("Sequential cell is not allowed outside whitelisted mc_* macros: " + type);
+        }
+
+        if (normalized.contains("XNOR")) {
+            return CellKind.XNOR;
+        }
+        if (normalized.contains("NAND")) {
+            return CellKind.NAND;
+        }
+        if (normalized.contains("NOR")) {
+            return CellKind.NOR;
+        }
+        if (normalized.contains("MUX")) {
+            return CellKind.MUX;
+        }
+        if (normalized.contains("XOR")) {
+            return CellKind.XOR;
+        }
+        if (normalized.contains("AND")) {
+            return CellKind.AND;
+        }
+        if (normalized.contains("NOT") || normalized.contains("INV")) {
+            return CellKind.INV;
+        }
+        if (normalized.contains("OR")) {
+            return CellKind.OR;
+        }
+        if (normalized.contains("BUF")) {
+            return CellKind.BUF;
+        }
+        if (normalized.contains("RELAY")) {
+            return CellKind.RELAY;
+        }
+
+        throw new MHDLException("Unknown cell: " + type);
+    }
+
+    private static boolean containsMacro(String normalizedType, String macroName) {
+        String macro = normalize(macroName);
+        return normalizedType.equals(macro)
+                || normalizedType.contains("\\" + macro)
+                || normalizedType.contains("$PARAMOD\\" + macro)
+                || normalizedType.contains("$PARAMOD_" + macro)
+                || normalizedType.contains("/" + macro)
+                || normalizedType.contains("_" + macro);
+    }
+
+    private static boolean isNonWhitelistedSequentialCell(String normalizedType) {
+        return normalizedType.contains("DFF")
+                || normalizedType.contains("DLATCH")
+                || normalizedType.contains("LATCH")
+                || normalizedType.contains("ADFF")
+                || normalizedType.contains("SDFF")
+                || normalizedType.contains("ALDFF")
+                || normalizedType.contains("SR") && normalizedType.contains("FF");
+    }
+
+    private static String normalize(String str) {
+        if (str == null) {
+            return "";
+        }
+        return str.trim().toUpperCase(Locale.ROOT);
+    }
+
+    public static int putInToNet(int net, Vertex vertex, Graph graph) {
+        if (net == 0 || net == 1) {
+            highLowNets--;
+            FunctionType constantType = (net == 0) ? FunctionType.LOW : FunctionType.HIGH;
+            Function constant = new Function(nextCellId(), constantType, 0);
+            fromNet.put(highLowNets, constant);
+            toNet.put(highLowNets, new ArrayList<Vertex>());
+            toNet.get(highLowNets).add(vertex);
+            graph.addVertex(constant);
+            return highLowNets;
+        }
+
+        if (!toNet.containsKey(net)) {
+            toNet.put(net, new ArrayList<Vertex>());
+        }
+        toNet.get(net).add(vertex);
+        return net;
+    }
+
+    public static int putInFromNet(int net, Vertex vertex) {
+        if (fromNet.containsKey(net)) {
+            throw new MHDLException("Two outputs on same net id: " + net);
+        }
+        fromNet.put(net, vertex);
+        return net;
+    }
+
+    private static int toNetId(Object bitToken) {
+        if (bitToken instanceof Number) {
+            return ((Number) bitToken).intValue();
+        }
+
+        if (bitToken instanceof String) {
+            String token = ((String) bitToken).trim();
+            if ("0".equals(token)) {
+                return 0;
+            }
+            if ("1".equals(token)) {
+                return 1;
+            }
+            if ("x".equalsIgnoreCase(token) || "z".equalsIgnoreCase(token)) {
+                return 0;
+            }
+            throw new MHDLException("Unsupported literal net token: '" + token + "'");
+        }
+
+        throw new MHDLException("Unsupported net token type: " + bitToken);
+    }
+
+    private static int nextCellId() {
+        int id = cellIds;
+        cellIds++;
+        return id;
+    }
+
+    private static int nextGeneratedNet() {
+        int id = generatedNetId;
+        generatedNetId--;
+        return id;
+    }
 }
-
-
-	class Port{
-		String name;
-		String direction;
-		ArrayList<Integer> bits=new ArrayList<Integer>();
-
-		public Port(String n, String d, ArrayList<Integer> b){
-			name=n;
-			direction=d;
-			bits=b;
-		}
-
-	}
-
-	class Cell{
-		int id;
-		String type;
-		ArrayList<Connection> connections=new ArrayList<Connection>();
-
-		ArrayList<Integer> inputs=new ArrayList<Integer>();
-		ArrayList<Integer> outputs=new ArrayList<Integer>();
-
-		public Cell(int i, String t, ArrayList<Connection> cns){
-			id=i;
-			type=t;
-			connections=cns;
-
-
-			for(Connection c:connections){
-				if(c.direction.equals("input")){
-					for(int j=0; j<c.IDs.length; j++){
-						inputs.add(c.IDs[j]);
-					}
-				}
-				else{
-					for(int j=0; j<c.IDs.length; j++){
-						outputs.add(c.IDs[j]);
-					}
-				}
-
-			}
-
-
-		}
-
-		public Connection getConn(String name){
-			for (Connection c : this.connections){
-				if (c.name.equals(name)) return c;
-			}
-			return null;
-		}
-
-
-	}
-
-	class Connection{
-		String name;
-		String direction;
-		int IDs[];
-
-		public Connection(String d, ArrayList<Integer> arr, String name){
-			this.name = name;
-			direction=d;
-			IDs= new int[arr.size()];
-			for(int j=0; j<arr.size(); j++){
-				IDs[j]=arr.get(j);
-
-			}
-
-
-		}
-
-	}
-
-//
-//class Port{
-//	String name;
-//	String direction;
-//	ArrayList<Integer> bits=new ArrayList<>();
-//
-//	public Port(String n, String d, JsonArray b){
-//		name=n;
-//		direction=d;
-//
-//
-//		for(int i=0; i<b.size(); i++){
-//			bits.add(b.get(i).getAsInt());
-//		}
-//
-//	}
-//
-//}
-//
-//class Cell{
-//	int id;
-//	String type;
-//	ArrayList<Connection> connections=new ArrayList<>();
-//
-//	ArrayList<Integer> inputs=new ArrayList<Integer>();
-//	ArrayList<Integer> outputs=new ArrayList<>();
-//
-//	public Cell(int i, String t, ArrayList<Connection> cns){
-//		id=i;
-//		type=t;
-//		connections=cns;
-//
-//
-//		for(Connection c:connections){
-//			if(c.direction.equals("input")){
-//				for(int j=0; j<c.IDs.length; j++){
-//					inputs.add(c.IDs[j]);
-//				}
-//			}
-//			else{
-//				for(int j=0; j<c.IDs.length; j++){
-//					outputs.add(c.IDs[j]);
-//				}
-//			}
-//
-//		}
-//
-//
-//	}
-//
-//
-//}
-//
-//class Connection{
-//
-//	String direction;
-//	int IDs[];
-//
-//	public Connection(String d, JsonArray arr){
-//		direction=d;
-//		IDs= new int[arr.size()];
-//		for(int j=0; j<arr.size(); j++){
-//			IDs[j]=arr.get(j).getAsInt();
-//
-//		}
-//
-//
-//	}
-//
-//}
-//
-
-
-
-
-
-
-
-
