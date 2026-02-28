@@ -17,6 +17,40 @@ public class Circuit {
 
     private final ArrayList<ArrayList<ArrayList<BlockState>>> blocks;
 
+    public static final class Placement {
+        private final BlockPos origin;
+        private final int width;
+        private final int height;
+        private final int length;
+
+        public Placement(BlockPos origin, int width, int height, int length) {
+            this.origin = origin;
+            this.width = width;
+            this.height = height;
+            this.length = length;
+        }
+
+        public BlockPos origin() {
+            return this.origin;
+        }
+
+        public int width() {
+            return this.width;
+        }
+
+        public int height() {
+            return this.height;
+        }
+
+        public int length() {
+            return this.length;
+        }
+
+        public BlockPos maxCorner() {
+            return this.origin.offset(this.width - 1, this.height - 1, this.length - 1);
+        }
+    }
+
     public Circuit(int sizeX, int sizeY, int sizeZ) {
         this.blocks = new ArrayList<>();
         for (int x = 0; x < sizeX; x++) {
@@ -39,10 +73,10 @@ public class Circuit {
         this.blocks.get(x).get(y).set(z, blockstate);
     }
 
-    public void placeInWorld(Level level, BlockPos pos, Direction direction) {
-        int width = blocks.size();
-        int height = blocks.get(0).size();
-        int length = blocks.get(0).get(0).size();
+    public Placement getPlacement(BlockPos pos, Direction direction) {
+        int width = this.getSizeX();
+        int height = this.getSizeY();
+        int length = this.getSizeZ();
 
         int startX = pos.getX();
         int startY = pos.getY();
@@ -57,6 +91,19 @@ public class Circuit {
         } else if (direction == Direction.WEST) {
             startX -= width + 1;
         }
+
+        return new Placement(new BlockPos(startX, startY, startZ), width, height, length);
+    }
+
+    public void placeInWorld(Level level, BlockPos pos, Direction direction) {
+        Placement placement = this.getPlacement(pos, direction);
+        int width = placement.width();
+        int height = placement.height();
+        int length = placement.length();
+
+        int startX = placement.origin().getX();
+        int startY = placement.origin().getY();
+        int startZ = placement.origin().getZ();
 
         int y = startY - 1;
         for (int z = startZ - 1; z < startZ + length + 1; z++) {

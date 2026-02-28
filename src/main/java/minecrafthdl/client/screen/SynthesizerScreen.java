@@ -43,7 +43,7 @@ public class SynthesizerScreen extends Screen {
                 .bounds(centerX - 70, buttonY, 60, 20)
                 .build());
 
-        this.generateButton = this.addRenderableWidget(Button.builder(Component.literal("Generate"), b -> applySelection())
+        this.generateButton = this.addRenderableWidget(Button.builder(Component.literal("Select"), b -> applySelection())
                 .bounds(centerX, buttonY, 80, 20)
                 .build());
 
@@ -76,7 +76,7 @@ public class SynthesizerScreen extends Screen {
                     Component.literal((this.selectedIndex + 1) + " / " + this.designFiles.size()),
                     centerX, centerY, 0xA0A0A0);
             guiGraphics.drawCenteredString(this.font,
-                    Component.literal("Use Prev/Next to choose, then Generate"),
+                    Component.literal("Choose a file, then power once to preview"),
                     centerX, centerY + 14, 0xA0A0A0);
         }
     }
@@ -104,7 +104,7 @@ public class SynthesizerScreen extends Screen {
 
         if (this.minecraft != null && this.minecraft.player != null) {
             this.minecraft.player.displayClientMessage(
-                    Component.literal("Selected design: " + selected.getFileName()).withStyle(ChatFormatting.GREEN),
+                    Component.literal("Selected design: " + selected.getFileName() + " (power once for preview, twice to build)").withStyle(ChatFormatting.GREEN),
                     false
             );
         }
