@@ -10,6 +10,8 @@ public final class MacroRuntimeModel {
 
     public static final class State {
         public boolean prevClk;
+        public long prevInputMask;
+        public int autoClockTickCounter;
 
         public int timerRemaining;
 
@@ -31,6 +33,8 @@ public final class MacroRuntimeModel {
 
         public void resetAll() {
             prevClk = false;
+            prevInputMask = 0L;
+            autoClockTickCounter = 0;
             timerRemaining = 0;
             periodicCounter = 0;
             periodicPulse = false;
@@ -47,37 +51,72 @@ public final class MacroRuntimeModel {
     }
 
     public static boolean tick(String macroName, String outputPort, int outputBit, Map<String, Long> params, boolean[] inputs, State state) {
+        step(macroName, params, inputs, state);
+        return readOutput(macroName, outputPort, outputBit, state);
+    }
+
+    /**
+     * Advances one macro instance by one simulation/server tick.
+     * Output querying should be done via {@link #readOutput(String, String, int, State)}.
+     */
+    public static void step(String macroName, Map<String, Long> params, boolean[] inputs, State state) {
+        if (macroName == null || state == null) {
+            return;
+        }
+
+        String normalized = macroName.toLowerCase(Locale.ROOT);
+        long currentInputMask = inputMask(inputs);
+        long previousInputMask = state.prevInputMask;
+        boolean rising = risingEdge(params, inputs, state);
+
+        switch (normalized) {
+            case "mc_timer":
+                stepTimer(rising, inputs, params, state, currentInputMask, previousInputMask);
+                break;
+
+            case "mc_periodic":
+                stepPeriodic(rising, inputs, params, state);
+                break;
+
+            case "mc_latch":
+                stepLatch(rising, inputs, state, currentInputMask, previousInputMask);
+                break;
+
+            case "mc_counter":
+                stepCounter(rising, inputs, params, state, currentInputMask, previousInputMask);
+                break;
+
+            case "mc_seq_lock":
+                stepSeqLock(rising, inputs, params, state, currentInputMask, previousInputMask);
+                break;
+
+            case "mc_station_fsm":
+                stepStation(rising, inputs, params, state, currentInputMask, previousInputMask);
+                break;
+
+            default:
+                break;
+        }
+
+        state.prevInputMask = currentInputMask;
+    }
+
+    public static boolean readOutput(String macroName, String outputPort, int outputBit, State state) {
         if (macroName == null || outputPort == null || state == null) {
             return false;
         }
 
         String normalized = macroName.toLowerCase(Locale.ROOT);
-        boolean clk = input(inputs, 0);
-        boolean rising = !state.prevClk && clk;
-        state.prevClk = clk;
-
         switch (normalized) {
             case "mc_timer":
-                stepTimer(rising, inputs, params, state);
                 return "active".equals(outputPort) && state.timerRemaining > 0;
-
             case "mc_periodic":
-                stepPeriodic(rising, inputs, params, state);
                 return "pulse".equals(outputPort) && state.periodicPulse;
-
             case "mc_latch":
-                stepLatch(rising, inputs, state);
                 return "q".equals(outputPort) && state.latchQ;
-
             case "mc_counter":
-                stepCounter(rising, inputs, params, state);
-                if (!"count".equals(outputPort)) {
-                    return false;
-                }
-                return bit(state.counterValue, outputBit);
-
+                return "count".equals(outputPort) && bit(state.counterValue, outputBit);
             case "mc_seq_lock":
-                stepSeqLock(rising, inputs, params, state);
                 if ("unlocked".equals(outputPort)) {
                     return state.seqUnlocked;
                 }
@@ -87,34 +126,41 @@ public final class MacroRuntimeModel {
                 if ("wrong_pulse".equals(outputPort)) {
                     return state.seqWrongPulse;
                 }
-                if ("progress".equals(outputPort)) {
-                    return bit(state.seqProgress, outputBit);
-                }
-                return false;
-
+                return "progress".equals(outputPort) && bit(state.seqProgress, outputBit);
             case "mc_station_fsm":
-                stepStation(rising, inputs, params, state);
                 if ("occupied".equals(outputPort)) {
                     return state.stationState != 0;
                 }
-                if ("depart_now".equals(outputPort)) {
-                    return state.stationDepartNow;
-                }
-                return false;
-
+                return "depart_now".equals(outputPort) && state.stationDepartNow;
             default:
                 return false;
         }
     }
 
-    private static void stepTimer(boolean rising, boolean[] inputs, Map<String, Long> params, State state) {
+    private static boolean risingEdge(Map<String, Long> params, boolean[] inputs, State state) {
+        if (intParam(params, "AUTO_CLK", 0) != 0) {
+            int periodTicks = Math.max(1, intParam(params, "AUTO_CLK_PERIOD_TICKS", 2));
+            boolean clk = state.autoClockTickCounter % periodTicks == 0;
+            state.autoClockTickCounter++;
+
+            boolean rising = !state.prevClk && clk;
+            state.prevClk = clk;
+            return rising;
+        }
+        boolean clk = input(inputs, 0);
+        boolean rising = !state.prevClk && clk;
+        state.prevClk = clk;
+        return rising;
+    }
+
+    private static void stepTimer(boolean rising, boolean[] inputs, Map<String, Long> params, State state, long currentInputMask, long previousInputMask) {
         if (!rising) {
             return;
         }
 
         int ticks = intParam(params, "TICKS", 60);
         boolean rst = input(inputs, 1);
-        boolean triggerPulse = input(inputs, 2);
+        boolean triggerPulse = inputPulse(currentInputMask, previousInputMask, 2);
 
         if (rst) {
             state.timerRemaining = 0;
@@ -154,14 +200,14 @@ public final class MacroRuntimeModel {
         }
     }
 
-    private static void stepLatch(boolean rising, boolean[] inputs, State state) {
+    private static void stepLatch(boolean rising, boolean[] inputs, State state, long currentInputMask, long previousInputMask) {
         if (!rising) {
             return;
         }
 
         boolean rst = input(inputs, 1);
-        boolean setPulse = input(inputs, 2);
-        boolean clearPulse = input(inputs, 3);
+        boolean setPulse = inputPulse(currentInputMask, previousInputMask, 2);
+        boolean clearPulse = inputPulse(currentInputMask, previousInputMask, 3);
 
         if (rst || clearPulse) {
             state.latchQ = false;
@@ -170,7 +216,7 @@ public final class MacroRuntimeModel {
         }
     }
 
-    private static void stepCounter(boolean rising, boolean[] inputs, Map<String, Long> params, State state) {
+    private static void stepCounter(boolean rising, boolean[] inputs, Map<String, Long> params, State state, long currentInputMask, long previousInputMask) {
         if (!rising) {
             return;
         }
@@ -179,8 +225,8 @@ public final class MacroRuntimeModel {
         int mask = width >= 31 ? -1 : ((1 << width) - 1);
 
         boolean rst = input(inputs, 1);
-        boolean incPulse = input(inputs, 2);
-        boolean clearPulse = input(inputs, 3);
+        boolean incPulse = inputPulse(currentInputMask, previousInputMask, 2);
+        boolean clearPulse = inputPulse(currentInputMask, previousInputMask, 3);
 
         if (rst || clearPulse) {
             state.counterValue = 0;
@@ -189,7 +235,7 @@ public final class MacroRuntimeModel {
         }
     }
 
-    private static void stepSeqLock(boolean rising, boolean[] inputs, Map<String, Long> params, State state) {
+    private static void stepSeqLock(boolean rising, boolean[] inputs, Map<String, Long> params, State state, long currentInputMask, long previousInputMask) {
         if (!rising) {
             return;
         }
@@ -213,7 +259,7 @@ public final class MacroRuntimeModel {
             return;
         }
 
-        int pressed = decodeOneHot(inputs, 3, btnCount);
+        int pressed = decodeOneHotPulses(currentInputMask, previousInputMask, 3, btnCount);
         if (pressed == -1) {
             return;
         }
@@ -240,7 +286,7 @@ public final class MacroRuntimeModel {
         }
     }
 
-    private static void stepStation(boolean rising, boolean[] inputs, Map<String, Long> params, State state) {
+    private static void stepStation(boolean rising, boolean[] inputs, Map<String, Long> params, State state, long currentInputMask, long previousInputMask) {
         if (!rising) {
             return;
         }
@@ -249,8 +295,8 @@ public final class MacroRuntimeModel {
 
         boolean rst = input(inputs, 1);
         boolean clear = input(inputs, 2);
-        boolean arrivalPulse = input(inputs, 3);
-        boolean departPulse = input(inputs, 4);
+        boolean arrivalPulse = inputPulse(currentInputMask, previousInputMask, 3);
+        boolean departPulse = inputPulse(currentInputMask, previousInputMask, 4);
 
         if (rst || clear) {
             state.stationState = 0;
@@ -289,10 +335,10 @@ public final class MacroRuntimeModel {
         }
     }
 
-    private static int decodeOneHot(boolean[] inputs, int start, int width) {
+    private static int decodeOneHotPulses(long currentInputMask, long previousInputMask, int start, int width) {
         int pressed = -1;
         for (int i = 0; i < width; i++) {
-            if (!input(inputs, start + i)) {
+            if (!inputPulse(currentInputMask, previousInputMask, start + i)) {
                 continue;
             }
             if (pressed != -1) {
@@ -321,17 +367,42 @@ public final class MacroRuntimeModel {
     }
 
     private static int intParam(Map<String, Long> params, String key, int fallback) {
+        if (params == null) {
+            return fallback;
+        }
         Long value = params.get(key);
         return value == null ? fallback : value.intValue();
     }
 
     private static long longParam(Map<String, Long> params, String key, long fallback) {
+        if (params == null) {
+            return fallback;
+        }
         Long value = params.get(key);
         return value == null ? fallback : value;
     }
 
     private static boolean input(boolean[] inputs, int index) {
         return index >= 0 && index < inputs.length && inputs[index];
+    }
+
+    private static long inputMask(boolean[] inputs) {
+        long mask = 0L;
+        int max = Math.min(63, inputs.length);
+        for (int i = 0; i < max; i++) {
+            if (inputs[i]) {
+                mask |= (1L << i);
+            }
+        }
+        return mask;
+    }
+
+    private static boolean inputPulse(long currentMask, long previousMask, int index) {
+        if (index < 0 || index >= 63) {
+            return false;
+        }
+        long bit = 1L << index;
+        return (currentMask & bit) != 0L && (previousMask & bit) == 0L;
     }
 
     private static boolean bit(int value, int bitIndex) {

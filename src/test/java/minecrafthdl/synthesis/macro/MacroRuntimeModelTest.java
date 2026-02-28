@@ -100,6 +100,63 @@ class MacroRuntimeModelTest {
         assertFalse(tick("mc_station_fsm", "depart_now", 0, params, true, false, false, false, false, state));
     }
 
+    @Test
+    void timerRunsWithAutoClockEvenWhenClkInputStaysLow() {
+        MacroRuntimeModel.State state = new MacroRuntimeModel.State();
+        Map<String, Long> params = new HashMap<String, Long>();
+        params.put("TICKS", 2L);
+        params.put("AUTO_CLK", 1L);
+
+        // clk input (i0) stays low throughout; AUTO_CLK drives macro updates.
+        assertTrue(tick("mc_timer", "active", 0, params, false, false, true, state));
+        assertTrue(tick("mc_timer", "active", 0, params, false, false, false, state));
+        assertTrue(tick("mc_timer", "active", 0, params, false, false, false, state));
+        assertTrue(tick("mc_timer", "active", 0, params, false, false, false, state));
+        assertFalse(tick("mc_timer", "active", 0, params, false, false, false, state));
+    }
+
+    @Test
+    void seqLockTreatsHeldButtonAsSinglePulse() {
+        MacroRuntimeModel.State state = new MacroRuntimeModel.State();
+        Map<String, Long> params = new HashMap<String, Long>();
+        params.put("BTN_COUNT", 3L);
+        params.put("SEQ_LEN", 3L);
+        params.put("LATCH_SUCCESS", 1L);
+        params.put("EXPECT_IDX", 36L);
+        params.put("AUTO_CLK", 1L);
+
+        // Hold button A across two rising edges; should count only once.
+        tick("mc_seq_lock", "wrong_pulse", 0, params, false, false, false, true, false, false, state);  // rising
+        tick("mc_seq_lock", "wrong_pulse", 0, params, false, false, false, true, false, false, state);  // falling
+        assertFalse(tick("mc_seq_lock", "wrong_pulse", 0, params, false, false, false, true, false, false, state)); // rising, no second pulse
+
+        // Release and press B.
+        tick("mc_seq_lock", "wrong_pulse", 0, params, false, false, false, false, false, false, state); // falling
+        tick("mc_seq_lock", "wrong_pulse", 0, params, false, false, false, false, true, false, state);  // rising
+        tick("mc_seq_lock", "wrong_pulse", 0, params, false, false, false, false, true, false, state);  // falling
+
+        // Release then press C -> success pulse.
+        tick("mc_seq_lock", "wrong_pulse", 0, params, false, false, false, false, false, false, state); // rising
+        tick("mc_seq_lock", "wrong_pulse", 0, params, false, false, false, false, false, false, state); // falling
+        assertTrue(tick("mc_seq_lock", "correct_pulse", 0, params, false, false, false, false, false, true, state)); // rising
+    }
+
+    @Test
+    void autoClockPeriodTicksControlsRisingEdgeCadence() {
+        MacroRuntimeModel.State state = new MacroRuntimeModel.State();
+        Map<String, Long> params = new HashMap<String, Long>();
+        params.put("TICKS", 1L);
+        params.put("AUTO_CLK", 1L);
+        params.put("AUTO_CLK_PERIOD_TICKS", 4L);
+
+        // Trigger timer once at tick 0 (rising), then it should stay active until next rising (tick 4).
+        assertTrue(tick("mc_timer", "active", 0, params, false, false, true, state));   // t0 rising + trigger
+        assertTrue(tick("mc_timer", "active", 0, params, false, false, false, state));  // t1
+        assertTrue(tick("mc_timer", "active", 0, params, false, false, false, state));  // t2
+        assertTrue(tick("mc_timer", "active", 0, params, false, false, false, state));  // t3
+        assertFalse(tick("mc_timer", "active", 0, params, false, false, false, state)); // t4 rising decrements to 0
+    }
+
     private static boolean tick(String macro, String outPort, int outBit, Map<String, Long> params,
                                 boolean i0, boolean i1, boolean i2, MacroRuntimeModel.State state) {
         return MacroRuntimeModel.tick(macro, outPort, outBit, params, new boolean[]{i0, i1, i2}, state);
@@ -113,6 +170,11 @@ class MacroRuntimeModelTest {
     private static boolean tick(String macro, String outPort, int outBit, Map<String, Long> params,
                                 boolean i0, boolean i1, boolean i2, boolean i3, boolean i4, MacroRuntimeModel.State state) {
         return MacroRuntimeModel.tick(macro, outPort, outBit, params, new boolean[]{i0, i1, i2, i3, i4}, state);
+    }
+
+    private static boolean tick(String macro, String outPort, int outBit, Map<String, Long> params,
+                                boolean i0, boolean i1, boolean i2, boolean i3, boolean i4, boolean i5, MacroRuntimeModel.State state) {
+        return MacroRuntimeModel.tick(macro, outPort, outBit, params, new boolean[]{i0, i1, i2, i3, i4, i5}, state);
     }
 
     private static void tickSeqLockPulse(Map<String, Long> params, MacroRuntimeModel.State state,

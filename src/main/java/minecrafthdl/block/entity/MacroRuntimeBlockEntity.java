@@ -2,6 +2,7 @@ package minecrafthdl.block.entity;
 
 import minecrafthdl.block.blocks.MacroRuntimeBlock;
 import minecrafthdl.synthesis.Circuit;
+import minecrafthdl.synthesis.macro.MacroRuntimeInstanceRegistry;
 import minecrafthdl.synthesis.macro.MacroRuntimeModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -15,18 +16,23 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.WeakHashMap;
 
 public class MacroRuntimeBlockEntity extends BlockEntity {
 
     private static final String TAG_MACRO_NAME = "macroName";
+    private static final String TAG_INSTANCE_NAME = "instanceName";
     private static final String TAG_OUTPUT_PORT = "outputPort";
     private static final String TAG_OUTPUT_BIT = "outputBit";
     private static final String TAG_INPUT_COUNT = "inputCount";
     private static final String TAG_INPUT_STRIDE = "inputStride";
+    private static final String TAG_CIRCUIT_ORIGIN = "circuitOrigin";
     private static final String TAG_PARAMS = "params";
 
     private static final String TAG_STATE = "state";
     private static final String TAG_PREV_CLK = "prevClk";
+    private static final String TAG_PREV_INPUT_MASK = "prevInputMask";
+    private static final String TAG_AUTO_CLOCK_TICKS = "autoClockTickCounter";
     private static final String TAG_TIMER_REMAINING = "timerRemaining";
     private static final String TAG_PERIODIC_COUNTER = "periodicCounter";
     private static final String TAG_PERIODIC_PULSE = "periodicPulse";
@@ -40,11 +46,15 @@ public class MacroRuntimeBlockEntity extends BlockEntity {
     private static final String TAG_STATION_TICKS = "stationTicksRemaining";
     private static final String TAG_STATION_DEPART = "stationDepartNow";
 
+    private static final WeakHashMap<Level, MacroRuntimeInstanceRegistry> SHARED_REGISTRIES = new WeakHashMap<Level, MacroRuntimeInstanceRegistry>();
+
     private String macroName = "";
+    private String instanceName = "";
     private String outputPort = "";
     private int outputBit = 0;
     private int inputCount = 0;
     private int inputStride = 2;
+    private String circuitOriginKey = "";
 
     private final LinkedHashMap<String, Long> params = new LinkedHashMap<String, Long>();
     private final MacroRuntimeModel.State state = new MacroRuntimeModel.State();
@@ -57,12 +67,15 @@ public class MacroRuntimeBlockEntity extends BlockEntity {
         blockEntity.tickServer();
     }
 
-    public void configure(Circuit.MacroPlacement placement) {
+    public void configure(Circuit.MacroPlacement placement, String originKey) {
+        clearSharedState();
         this.macroName = placement.macroName;
+        this.instanceName = placement.instanceName == null ? "" : placement.instanceName;
         this.outputPort = placement.outputPort;
         this.outputBit = placement.outputBit;
         this.inputCount = placement.inputCount;
         this.inputStride = placement.inputStride;
+        this.circuitOriginKey = originKey == null ? "" : originKey;
 
         this.params.clear();
         this.params.putAll(placement.params);
@@ -86,9 +99,67 @@ public class MacroRuntimeBlockEntity extends BlockEntity {
             inputs[i] = readInput(i);
         }
 
-        boolean out = MacroRuntimeModel.tick(this.macroName, this.outputPort, this.outputBit, this.params, inputs, this.state);
+        boolean out = readRuntimeOutput(inputs);
         setPowered(out);
         setChanged();
+    }
+
+    private boolean readRuntimeOutput(boolean[] inputs) {
+        if (this.level == null) {
+            return false;
+        }
+        String key = sharedStateKey();
+        MacroRuntimeInstanceRegistry.SharedState shared = registryFor(this.level).getOrCreate(key);
+        boolean out = MacroRuntimeInstanceRegistry.evaluate(
+                shared,
+                this.level.getGameTime(),
+                this.macroName,
+                this.outputPort,
+                this.outputBit,
+                this.params,
+                inputs,
+                this.state
+        );
+        MacroRuntimeInstanceRegistry.copyState(shared.state, this.state);
+        return out;
+    }
+
+    private String sharedStateKey() {
+        String origin = this.circuitOriginKey == null ? "" : this.circuitOriginKey;
+        String instance = this.instanceName == null ? "" : this.instanceName;
+        if (instance.isBlank()) {
+            instance = this.macroName + ":" + this.worldPosition.getX() + "," + this.worldPosition.getY() + "," + this.worldPosition.getZ();
+        }
+        return origin + "|" + instance;
+    }
+
+    private static MacroRuntimeInstanceRegistry registryFor(Level level) {
+        synchronized (SHARED_REGISTRIES) {
+            MacroRuntimeInstanceRegistry registry = SHARED_REGISTRIES.get(level);
+            if (registry == null) {
+                registry = new MacroRuntimeInstanceRegistry();
+                SHARED_REGISTRIES.put(level, registry);
+            }
+            return registry;
+        }
+    }
+
+    private void clearSharedState() {
+        if (this.level == null || this.macroName.isBlank()) {
+            return;
+        }
+        registryFor(this.level).clear(sharedStateKey());
+    }
+
+    private void syncFromSharedState() {
+        if (this.level == null || this.macroName.isBlank()) {
+            return;
+        }
+        MacroRuntimeInstanceRegistry.SharedState shared = registryFor(this.level).getOrCreate(sharedStateKey());
+        if (!shared.initialized) {
+            return;
+        }
+        MacroRuntimeInstanceRegistry.copyState(shared.state, this.state);
     }
 
     private boolean readInput(int index) {
@@ -136,12 +207,15 @@ public class MacroRuntimeBlockEntity extends BlockEntity {
     @Override
     protected void saveAdditional(CompoundTag tag) {
         super.saveAdditional(tag);
+        syncFromSharedState();
 
         tag.putString(TAG_MACRO_NAME, this.macroName);
+        tag.putString(TAG_INSTANCE_NAME, this.instanceName);
         tag.putString(TAG_OUTPUT_PORT, this.outputPort);
         tag.putInt(TAG_OUTPUT_BIT, this.outputBit);
         tag.putInt(TAG_INPUT_COUNT, this.inputCount);
         tag.putInt(TAG_INPUT_STRIDE, this.inputStride);
+        tag.putString(TAG_CIRCUIT_ORIGIN, this.circuitOriginKey);
 
         CompoundTag paramsTag = new CompoundTag();
         for (Map.Entry<String, Long> entry : this.params.entrySet()) {
@@ -151,6 +225,8 @@ public class MacroRuntimeBlockEntity extends BlockEntity {
 
         CompoundTag stateTag = new CompoundTag();
         stateTag.putBoolean(TAG_PREV_CLK, this.state.prevClk);
+        stateTag.putLong(TAG_PREV_INPUT_MASK, this.state.prevInputMask);
+        stateTag.putInt(TAG_AUTO_CLOCK_TICKS, this.state.autoClockTickCounter);
         stateTag.putInt(TAG_TIMER_REMAINING, this.state.timerRemaining);
         stateTag.putInt(TAG_PERIODIC_COUNTER, this.state.periodicCounter);
         stateTag.putBoolean(TAG_PERIODIC_PULSE, this.state.periodicPulse);
@@ -171,10 +247,12 @@ public class MacroRuntimeBlockEntity extends BlockEntity {
         super.load(tag);
 
         this.macroName = tag.getString(TAG_MACRO_NAME);
+        this.instanceName = tag.getString(TAG_INSTANCE_NAME);
         this.outputPort = tag.getString(TAG_OUTPUT_PORT);
         this.outputBit = tag.getInt(TAG_OUTPUT_BIT);
         this.inputCount = tag.getInt(TAG_INPUT_COUNT);
         this.inputStride = Math.max(1, tag.getInt(TAG_INPUT_STRIDE));
+        this.circuitOriginKey = tag.getString(TAG_CIRCUIT_ORIGIN);
 
         this.params.clear();
         CompoundTag paramsTag = tag.getCompound(TAG_PARAMS);
@@ -186,6 +264,8 @@ public class MacroRuntimeBlockEntity extends BlockEntity {
         if (tag.contains(TAG_STATE)) {
             CompoundTag stateTag = tag.getCompound(TAG_STATE);
             this.state.prevClk = stateTag.getBoolean(TAG_PREV_CLK);
+            this.state.prevInputMask = stateTag.getLong(TAG_PREV_INPUT_MASK);
+            this.state.autoClockTickCounter = stateTag.getInt(TAG_AUTO_CLOCK_TICKS);
             this.state.timerRemaining = stateTag.getInt(TAG_TIMER_REMAINING);
             this.state.periodicCounter = stateTag.getInt(TAG_PERIODIC_COUNTER);
             this.state.periodicPulse = stateTag.getBoolean(TAG_PERIODIC_PULSE);

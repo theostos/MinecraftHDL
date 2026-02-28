@@ -20,16 +20,33 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class IntermediateCircuit {
 
     public ArrayList<ArrayList<Vertex>> vertex_layers = new ArrayList<>();
     public ArrayList<ArrayList<Gate>> gate_layers = new ArrayList<>();
     public ArrayList<Channel> channels = new ArrayList<>();
+    private final SynthesisOptions options;
+
+    public IntermediateCircuit() {
+        this(SynthesisOptions.defaults());
+    }
+
+    public IntermediateCircuit(SynthesisOptions options) {
+        this.options = options == null ? SynthesisOptions.defaults() : options;
+    }
 
     public void loadGraph(Graph graph) {
         System.out.println("Graph built");
+
+        HashMap<Vertex, Integer> graphOrder = new HashMap<Vertex, Integer>();
+        for (int i = 0; i < graph.getVertices().size(); i++) {
+            graphOrder.put(graph.getVertices().get(i), i);
+        }
 
         ArrayList<Vertex> finished = new ArrayList<>();
         ArrayList<Vertex> in_process = new ArrayList<>();
@@ -83,29 +100,39 @@ public class IntermediateCircuit {
             layer_num++;
         }
 
-        ArrayList<Vertex> outputs_not_in_last = new ArrayList<>();
-
-        for (ArrayList<Vertex> v_l : this.vertex_layers) {
-            if (this.vertex_layers.indexOf(v_l) == vertex_layers.size() - 1) {
-                break;
-            }
-            ArrayList<Vertex> to_remove = new ArrayList<>();
-
-            for (Vertex v : v_l) {
+        ArrayList<Vertex> allOutputs = new ArrayList<Vertex>();
+        for (ArrayList<Vertex> layer : this.vertex_layers) {
+            ArrayList<Vertex> toRemove = new ArrayList<Vertex>();
+            for (Vertex v : layer) {
                 if (v.type == VertexType.OUTPUT) {
-                    outputs_not_in_last.add(v);
-                    to_remove.add(v);
+                    allOutputs.add(v);
+                    toRemove.add(v);
                 }
             }
-
-            for (Vertex v : to_remove) {
-                v_l.remove(v);
-            }
+            layer.removeAll(toRemove);
         }
 
+        allOutputs.sort(new Comparator<Vertex>() {
+            @Override
+            public int compare(Vertex left, Vertex right) {
+                Integer l = graphOrder.get(left);
+                Integer r = graphOrder.get(right);
+                if (l == null && r == null) {
+                    return 0;
+                }
+                if (l == null) {
+                    return 1;
+                }
+                if (r == null) {
+                    return -1;
+                }
+                return Integer.compare(l, r);
+            }
+        });
+
         ArrayList<Vertex> last_layer = this.vertex_layers.get(this.vertex_layers.size() - 1);
-        for (Vertex v : outputs_not_in_last) {
-            last_layer.add(v);
+        for (Vertex output : allOutputs) {
+            last_layer.add(output);
         }
 
         for (int i = 0; i < vertex_layers.size() - 1; i++) {
@@ -253,7 +280,7 @@ public class IntermediateCircuit {
             for (Gate g : this.gate_layers.get(i)) {
                 circuit.insertCircuit(x_offset, 0, z_offset, g);
 
-                if (g.getSizeZ() - 1 < layers_size_z[i]) {
+                if (g.getSizeZ() - 1 < layers_size_z[i] && !Circuit.TEST) {
                     for (int z = g.getSizeZ(); z < layers_size_z[i]; z++) {
                         if (z == layers_size_z[i] - 1) {
                             circuit.setBlock(x_offset, 0, z_offset + z, Utils.repeater(Direction.NORTH));
@@ -269,11 +296,14 @@ public class IntermediateCircuit {
 
             if (i < this.gate_layers.size() - 1) {
                 Channel c = this.channels.get(i);
-                circuit.insertCircuit(0, 0, z_offset, c.genChannelCircuit());
+                if (!Circuit.TEST) {
+                    circuit.insertCircuit(0, 0, z_offset, c.genChannelCircuit());
+                }
                 z_offset += c.sizeZ();
             }
         }
 
+        enforceSynthesisBudgets(circuit);
         return circuit;
     }
 
@@ -289,7 +319,7 @@ public class IntermediateCircuit {
         return FunctionType.Output;
     }
 
-    private static Gate genGate(Vertex v) {
+    private Gate genGate(Vertex v) {
         if (getFunctionType(v) == FunctionType.AND) {
             return Circuit.TEST ? TestLogicGates.AND(((Function) v).get_num_inputs()) : LogicGates.AND(((Function) v).get_num_inputs());
         } else if (getFunctionType(v) == FunctionType.OR) {
@@ -303,9 +333,9 @@ public class IntermediateCircuit {
         } else if (getFunctionType(v) == FunctionType.MUX) {
             return Circuit.TEST ? TestLogicGates.MUX() : LogicGates.MUX();
         } else if (getFunctionType(v) == FunctionType.Input) {
-            return Circuit.TEST ? TestLogicGates.IO() : LogicGates.Input(v.getID());
+            return Circuit.TEST ? TestLogicGates.IO(v.getID()) : LogicGates.Input(v.getID());
         } else if (getFunctionType(v) == FunctionType.Output) {
-            return Circuit.TEST ? TestLogicGates.IO() : LogicGates.Output(v.getID());
+            return Circuit.TEST ? TestLogicGates.IO(v.getID()) : LogicGates.Output(v.getID());
         } else if (getFunctionType(v) == FunctionType.HIGH) {
             return Circuit.TEST ? TestLogicGates.HIGH() : LogicGates.HIGH();
         } else if (getFunctionType(v) == FunctionType.LOW) {
@@ -316,22 +346,22 @@ public class IntermediateCircuit {
             if (!(v instanceof MacroVertex)) throw new MHDLException("MC_TIMER requires MacroVertex metadata");
             MacroVertex mv = (MacroVertex) v;
             return Circuit.TEST ? TestLogicGates.MC_TIMER()
-                    : LogicGates.MC_TIMER(param(mv, "TICKS", 60), mv.getOutputPort(), mv.getOutputBitIndex());
+                    : LogicGates.MC_TIMER(param(mv, "TICKS", 60), mv.getInstanceName(), mv.getOutputPort(), mv.getOutputBitIndex(), this.options);
         } else if (getFunctionType(v) == FunctionType.MC_PERIODIC) {
             if (!(v instanceof MacroVertex)) throw new MHDLException("MC_PERIODIC requires MacroVertex metadata");
             MacroVertex mv = (MacroVertex) v;
             return Circuit.TEST ? TestLogicGates.MC_PERIODIC()
-                    : LogicGates.MC_PERIODIC(param(mv, "PERIOD", 20), mv.getOutputPort(), mv.getOutputBitIndex());
+                    : LogicGates.MC_PERIODIC(param(mv, "PERIOD", 20), mv.getInstanceName(), mv.getOutputPort(), mv.getOutputBitIndex(), this.options);
         } else if (getFunctionType(v) == FunctionType.MC_LATCH) {
             if (!(v instanceof MacroVertex)) throw new MHDLException("MC_LATCH requires MacroVertex metadata");
             MacroVertex mv = (MacroVertex) v;
             return Circuit.TEST ? TestLogicGates.MC_LATCH()
-                    : LogicGates.MC_LATCH(mv.getOutputPort(), mv.getOutputBitIndex());
+                    : LogicGates.MC_LATCH(mv.getInstanceName(), mv.getOutputPort(), mv.getOutputBitIndex(), this.options);
         } else if (getFunctionType(v) == FunctionType.MC_COUNTER) {
             if (!(v instanceof MacroVertex)) throw new MHDLException("MC_COUNTER requires MacroVertex metadata");
             MacroVertex mv = (MacroVertex) v;
             return Circuit.TEST ? TestLogicGates.MC_COUNTER()
-                    : LogicGates.MC_COUNTER(param(mv, "WIDTH", 8), mv.getOutputPort(), mv.getOutputBitIndex());
+                    : LogicGates.MC_COUNTER(param(mv, "WIDTH", 8), mv.getInstanceName(), mv.getOutputPort(), mv.getOutputBitIndex(), this.options);
         } else if (getFunctionType(v) == FunctionType.MC_SEQ_LOCK) {
             if (!(v instanceof MacroVertex)) throw new MHDLException("MC_SEQ_LOCK requires MacroVertex metadata");
             MacroVertex mv = (MacroVertex) v;
@@ -340,12 +370,12 @@ public class IntermediateCircuit {
             int latchSuccess = param(mv, "LATCH_SUCCESS", 1);
             long expectIdx = longParam(mv, "EXPECT_IDX", 0L);
             return Circuit.TEST ? TestLogicGates.MC_SEQ_LOCK(btnCount)
-                    : LogicGates.MC_SEQ_LOCK(btnCount, seqLen, latchSuccess, expectIdx, mv.getOutputPort(), mv.getOutputBitIndex());
+                    : LogicGates.MC_SEQ_LOCK(btnCount, seqLen, latchSuccess, expectIdx, mv.getInstanceName(), mv.getOutputPort(), mv.getOutputBitIndex(), this.options);
         } else if (getFunctionType(v) == FunctionType.MC_STATION_FSM) {
             if (!(v instanceof MacroVertex)) throw new MHDLException("MC_STATION_FSM requires MacroVertex metadata");
             MacroVertex mv = (MacroVertex) v;
             return Circuit.TEST ? TestLogicGates.MC_STATION_FSM()
-                    : LogicGates.MC_STATION_FSM(param(mv, "DEPART_TICKS", 20), mv.getOutputPort(), mv.getOutputBitIndex());
+                    : LogicGates.MC_STATION_FSM(param(mv, "DEPART_TICKS", 20), mv.getInstanceName(), mv.getOutputPort(), mv.getOutputBitIndex(), this.options);
         }
 
         throw new MHDLException("NO SUCH GATE AVAILABLE");
@@ -359,6 +389,83 @@ public class IntermediateCircuit {
     private static long longParam(MacroVertex vertex, String key, long defaultValue) {
         Long value = vertex.getParams().get(key);
         return value == null ? defaultValue : value;
+    }
+
+    private void enforceSynthesisBudgets(Circuit circuit) {
+        if (!this.options.prefabMacrosEnabled()) {
+            return;
+        }
+
+        long estimatedTotal = (long) circuit.getSizeX() * (long) circuit.getSizeY() * (long) circuit.getSizeZ();
+        if (estimatedTotal > this.options.prefabMacroTotalBlockBudget()) {
+            throw new MHDLException(
+                    "Prefab synthesis budget exceeded: estimated total blocks "
+                            + estimatedTotal
+                            + " > limit "
+                            + this.options.prefabMacroTotalBlockBudget()
+            );
+        }
+
+        LinkedHashMap<String, Integer> perInstanceEstimates = new LinkedHashMap<String, Integer>();
+        for (ArrayList<Vertex> layer : this.vertex_layers) {
+            for (Vertex vertex : layer) {
+                if (!(vertex instanceof MacroVertex)) {
+                    continue;
+                }
+                MacroVertex macro = (MacroVertex) vertex;
+                String key = macro.getInstanceName();
+                if (key == null || key.isBlank()) {
+                    key = "__anon_" + macro.getMacroName() + "_" + macro.getID();
+                }
+                if (perInstanceEstimates.containsKey(key)) {
+                    continue;
+                }
+                perInstanceEstimates.put(key, estimateMacroInstanceBlocks(macro));
+            }
+        }
+
+        for (Map.Entry<String, Integer> entry : perInstanceEstimates.entrySet()) {
+            if (entry.getValue() <= this.options.prefabMacroPerInstanceBlockBudget()) {
+                continue;
+            }
+            throw new MHDLException(
+                    "Prefab synthesis per-instance budget exceeded for macro instance '"
+                            + entry.getKey()
+                            + "': estimated blocks "
+                            + entry.getValue()
+                            + " > limit "
+                            + this.options.prefabMacroPerInstanceBlockBudget()
+            );
+        }
+    }
+
+    private static int estimateMacroInstanceBlocks(MacroVertex macro) {
+        String name = macro.getMacroName();
+        if ("mc_timer".equals(name)) {
+            int ticks = param(macro, "TICKS", 60);
+            return Math.max(120, ticks * 4);
+        }
+        if ("mc_periodic".equals(name)) {
+            int period = param(macro, "PERIOD", 20);
+            return Math.max(100, period * 4);
+        }
+        if ("mc_latch".equals(name)) {
+            return 140;
+        }
+        if ("mc_counter".equals(name)) {
+            int width = param(macro, "WIDTH", 8);
+            return 160 + (width * 120);
+        }
+        if ("mc_seq_lock".equals(name)) {
+            int btnCount = param(macro, "BTN_COUNT", 3);
+            int seqLen = param(macro, "SEQ_LEN", 3);
+            return 240 + (btnCount * 110) + (seqLen * 130);
+        }
+        if ("mc_station_fsm".equals(name)) {
+            int departTicks = param(macro, "DEPART_TICKS", 20);
+            return 220 + Math.min(1200, departTicks * 2);
+        }
+        return 256;
     }
 
     public void verify(Level worldIn, BlockPos pos) {

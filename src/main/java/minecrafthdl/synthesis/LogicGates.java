@@ -24,6 +24,7 @@ public class LogicGates {
 
         gate.setBlock(0, 0, 0, Blocks.WHITE_WOOL.defaultBlockState());
         gate.setBlock(0, 1, 0, Utils.standingSignRotation(8));
+        gate.addSignPlacement(new Circuit.SignPlacement(0, 1, 0, id));
         return gate;
     }
 
@@ -33,6 +34,7 @@ public class LogicGates {
 
         gate.setBlock(0, 0, 0, Blocks.REDSTONE_LAMP.defaultBlockState());
         gate.setBlock(0, 1, 0, Utils.standingSignRotation(0));
+        gate.addSignPlacement(new Circuit.SignPlacement(0, 1, 0, id));
         return gate;
     }
 
@@ -218,45 +220,105 @@ public class LogicGates {
     }
 
     public static Gate MC_TIMER(int ticks, String outputPort, int outputBit) {
+        return MC_TIMER(ticks, "", outputPort, outputBit, SynthesisOptions.defaults());
+    }
+
+    public static Gate MC_TIMER(int ticks, String outputPort, int outputBit, SynthesisOptions options) {
+        return MC_TIMER(ticks, "", outputPort, outputBit, options);
+    }
+
+    public static Gate MC_TIMER(int ticks, String instanceName, String outputPort, int outputBit, SynthesisOptions options) {
         HashMap<String, Long> params = new HashMap<String, Long>();
         params.put("TICKS", (long) ticks);
-        return macroModule("mc_timer", 3, params, outputPort, outputBit);
+        params.put("AUTO_CLK", 1L);
+        params.put("AUTO_CLK_PERIOD_TICKS", (long) options.prefabAutoClockPeriodTicks());
+        return macroModule(instanceName, "mc_timer", 3, params, outputPort, outputBit);
     }
 
     public static Gate MC_PERIODIC(int period, String outputPort, int outputBit) {
+        return MC_PERIODIC(period, "", outputPort, outputBit, SynthesisOptions.defaults());
+    }
+
+    public static Gate MC_PERIODIC(int period, String outputPort, int outputBit, SynthesisOptions options) {
+        return MC_PERIODIC(period, "", outputPort, outputBit, options);
+    }
+
+    public static Gate MC_PERIODIC(int period, String instanceName, String outputPort, int outputBit, SynthesisOptions options) {
         HashMap<String, Long> params = new HashMap<String, Long>();
         params.put("PERIOD", (long) period);
-        return macroModule("mc_periodic", 3, params, outputPort, outputBit);
+        params.put("AUTO_CLK", 1L);
+        params.put("AUTO_CLK_PERIOD_TICKS", (long) options.prefabAutoClockPeriodTicks());
+        return macroModule(instanceName, "mc_periodic", 3, params, outputPort, outputBit);
     }
 
     public static Gate MC_LATCH(String outputPort, int outputBit) {
+        return MC_LATCH("", outputPort, outputBit, SynthesisOptions.defaults());
+    }
+
+    public static Gate MC_LATCH(String outputPort, int outputBit, SynthesisOptions options) {
+        return MC_LATCH("", outputPort, outputBit, options);
+    }
+
+    public static Gate MC_LATCH(String instanceName, String outputPort, int outputBit, SynthesisOptions options) {
         HashMap<String, Long> params = new HashMap<String, Long>();
-        return macroModule("mc_latch", 4, params, outputPort, outputBit);
+        params.put("AUTO_CLK", 1L);
+        params.put("AUTO_CLK_PERIOD_TICKS", (long) options.prefabAutoClockPeriodTicks());
+        return macroModule(instanceName, "mc_latch", 4, params, outputPort, outputBit);
     }
 
     public static Gate MC_COUNTER(int width, String outputPort, int outputBit) {
+        return MC_COUNTER(width, "", outputPort, outputBit, SynthesisOptions.defaults());
+    }
+
+    public static Gate MC_COUNTER(int width, String outputPort, int outputBit, SynthesisOptions options) {
+        return MC_COUNTER(width, "", outputPort, outputBit, options);
+    }
+
+    public static Gate MC_COUNTER(int width, String instanceName, String outputPort, int outputBit, SynthesisOptions options) {
         HashMap<String, Long> params = new HashMap<String, Long>();
         params.put("WIDTH", (long) width);
-        return macroModule("mc_counter", 4, params, outputPort, outputBit);
+        params.put("AUTO_CLK", 1L);
+        params.put("AUTO_CLK_PERIOD_TICKS", (long) options.prefabAutoClockPeriodTicks());
+        return macroModule(instanceName, "mc_counter", 4, params, outputPort, outputBit);
     }
 
     public static Gate MC_SEQ_LOCK(int btnCount, int seqLen, int latchSuccess, long expectIdx, String outputPort, int outputBit) {
+        return MC_SEQ_LOCK(btnCount, seqLen, latchSuccess, expectIdx, "", outputPort, outputBit, SynthesisOptions.defaults());
+    }
+
+    public static Gate MC_SEQ_LOCK(int btnCount, int seqLen, int latchSuccess, long expectIdx, String outputPort, int outputBit, SynthesisOptions options) {
+        return MC_SEQ_LOCK(btnCount, seqLen, latchSuccess, expectIdx, "", outputPort, outputBit, options);
+    }
+
+    public static Gate MC_SEQ_LOCK(int btnCount, int seqLen, int latchSuccess, long expectIdx, String instanceName, String outputPort, int outputBit, SynthesisOptions options) {
         int inputs = 3 + btnCount;
         HashMap<String, Long> params = new HashMap<String, Long>();
         params.put("BTN_COUNT", (long) btnCount);
         params.put("SEQ_LEN", (long) seqLen);
         params.put("LATCH_SUCCESS", (long) latchSuccess);
         params.put("EXPECT_IDX", expectIdx);
-        return macroModule("mc_seq_lock", inputs, params, outputPort, outputBit);
+        params.put("AUTO_CLK", 1L);
+        params.put("AUTO_CLK_PERIOD_TICKS", (long) options.prefabAutoClockPeriodTicks());
+        return macroModule(instanceName, "mc_seq_lock", inputs, params, outputPort, outputBit);
     }
 
     public static Gate MC_STATION_FSM(int departTicks, String outputPort, int outputBit) {
-        HashMap<String, Long> params = new HashMap<String, Long>();
-        params.put("DEPART_TICKS", (long) departTicks);
-        return macroModule("mc_station_fsm", 5, params, outputPort, outputBit);
+        return MC_STATION_FSM(departTicks, "", outputPort, outputBit, SynthesisOptions.defaults());
     }
 
-    private static Gate macroModule(String macroName, int inputs, HashMap<String, Long> params, String outputPort, int outputBit) {
+    public static Gate MC_STATION_FSM(int departTicks, String outputPort, int outputBit, SynthesisOptions options) {
+        return MC_STATION_FSM(departTicks, "", outputPort, outputBit, options);
+    }
+
+    public static Gate MC_STATION_FSM(int departTicks, String instanceName, String outputPort, int outputBit, SynthesisOptions options) {
+        HashMap<String, Long> params = new HashMap<String, Long>();
+        params.put("DEPART_TICKS", (long) departTicks);
+        params.put("AUTO_CLK", 1L);
+        params.put("AUTO_CLK_PERIOD_TICKS", (long) options.prefabAutoClockPeriodTicks());
+        return macroModule(instanceName, "mc_station_fsm", 5, params, outputPort, outputBit);
+    }
+
+    private static Gate macroModule(String instanceName, String macroName, int inputs, HashMap<String, Long> params, String outputPort, int outputBit) {
         if (inputs < 1) {
             throw new MHDLException("Macro module requires at least one input");
         }
@@ -277,6 +339,7 @@ public class LogicGates {
                 0,
                 0,
                 2,
+                instanceName,
                 macroName,
                 outputPort,
                 outputBit,

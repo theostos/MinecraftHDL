@@ -5,6 +5,7 @@ import com.mojang.logging.LogUtils;
 import minecrafthdl.client.ClientAccess;
 import minecrafthdl.synthesis.Circuit;
 import minecrafthdl.synthesis.IntermediateCircuit;
+import minecrafthdl.synthesis.SynthesisOptions;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -88,7 +89,7 @@ public class Synthesizer extends Block {
 
     private void synthGen(Level level, BlockPos pos) {
         try {
-            IntermediateCircuit intermediateCircuit = new IntermediateCircuit();
+            IntermediateCircuit intermediateCircuit = new IntermediateCircuit(SynthesisOptions.fromConfig());
             intermediateCircuit.loadGraph(GraphBuilder.buildGraph(fileToGenerate));
             intermediateCircuit.buildGates();
             intermediateCircuit.routeChannels();
