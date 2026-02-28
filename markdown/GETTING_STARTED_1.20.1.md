@@ -54,7 +54,6 @@ When running in dev mode, Forge common config is generated under:
 
 Macro-related keys:
 
-- `prefabMacros.enabled=false`
 - `prefabMacros.autoClockPeriodTicks=2`
 - `prefabMacros.totalBlockBudget=10000`
 - `prefabMacros.perInstanceBlockBudget=2000`

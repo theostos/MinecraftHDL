@@ -100,13 +100,12 @@ Macro behavior contract is documented in:
 Cycle-accurate macro simulation (without launching Minecraft) is covered by tests in:
 - `src/test/java/minecrafthdl/simulation/prefab/`
 
-Prefab-macro transition options are available through Forge common config:
-- `prefabMacros.enabled` (default `false`)
+Prefab-macro options are available through Forge common config:
 - `prefabMacros.autoClockPeriodTicks` (default `2`)
 - `prefabMacros.totalBlockBudget` (default `10000`)
 - `prefabMacros.perInstanceBlockBudget` (default `2000`)
 
-While `prefabMacros.enabled=false`, macro execution remains on the existing runtime macro path for in-game generation.
+Macro synthesis now uses prefab gate generation for all whitelisted `mc_*` modules.
  
 MinecraftHDL is an educational tool to illustrate on a macro-scopic scale how microelectronic digital circuits are designed and produced. It is a great way to introduce younger audiences to the world of digital design and can also be used to illustrate the difference between software and hardware design to undergraduate engineers taking their first RTL class.
 
