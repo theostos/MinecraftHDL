@@ -2,6 +2,7 @@ package minecrafthdl.testing;
 
 import minecrafthdl.Demo;
 import minecrafthdl.MHDLException;
+import minecrafthdl.synthesis.Circuit;
 import minecrafthdl.synthesis.Gate;
 import minecrafthdl.synthesis.IntermediateCircuit;
 import minecrafthdl.synthesis.LogicGates;
@@ -34,7 +35,13 @@ public class TestLogicGates extends LogicGates {
     }
 
     public static Gate IO(){
-        return unitGate(1, 1);
+        return IO("");
+    }
+
+    public static Gate IO(String id){
+        Gate gate = unitGate(1, 1);
+        gate.addSignPlacement(new Circuit.SignPlacement(0, 0, 0, id));
+        return gate;
     }
 
     public static Gate NOT(){

@@ -21,6 +21,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
@@ -36,8 +37,8 @@ public class GraphBuilder {
     private static final int MAX_SEQ_LEN = 16;
     private static final int MAX_DEPART_TICKS = 1200;
 
-    private static HashMap<Integer, Vertex> fromNet = new HashMap<Integer, Vertex>();
-    private static HashMap<Integer, ArrayList<Vertex>> toNet = new HashMap<Integer, ArrayList<Vertex>>();
+    private static LinkedHashMap<Integer, Vertex> fromNet = new LinkedHashMap<Integer, Vertex>();
+    private static LinkedHashMap<Integer, ArrayList<Vertex>> toNet = new LinkedHashMap<Integer, ArrayList<Vertex>>();
 
     private enum CellKind {
         AND,
@@ -78,8 +79,8 @@ public class GraphBuilder {
         JsonFile jsonFile = parseJson(path);
         Module module = selectTopModule(jsonFile);
 
-        fromNet = new HashMap<Integer, Vertex>();
-        toNet = new HashMap<Integer, ArrayList<Vertex>>();
+        fromNet = new LinkedHashMap<Integer, Vertex>();
+        toNet = new LinkedHashMap<Integer, ArrayList<Vertex>>();
 
         Graph graph = new Graph();
 
@@ -106,7 +107,7 @@ public class GraphBuilder {
 
         for (String cellName : module.cells.keySet()) {
             JCell cell = module.cells.get(cellName);
-            addCell(graph, cell);
+            addCell(graph, cellName, cell);
         }
 
         connectNets(graph);
@@ -159,7 +160,7 @@ public class GraphBuilder {
         throw new MHDLException("Could not determine top module. Ensure Yosys hierarchy marks a top module.");
     }
 
-    private static void addCell(Graph graph, JCell cell) {
+    private static void addCell(Graph graph, String cellName, JCell cell) {
         CellKind kind = resolveKind(cell.type);
 
         switch (kind) {
@@ -192,22 +193,22 @@ public class GraphBuilder {
                 addXnorCell(graph, cell);
                 break;
             case MC_TIMER:
-                addMcTimerCell(graph, cell);
+                addMcTimerCell(graph, cellName, cell);
                 break;
             case MC_PERIODIC:
-                addMcPeriodicCell(graph, cell);
+                addMcPeriodicCell(graph, cellName, cell);
                 break;
             case MC_LATCH:
-                addMcLatchCell(graph, cell);
+                addMcLatchCell(graph, cellName, cell);
                 break;
             case MC_COUNTER:
-                addMcCounterCell(graph, cell);
+                addMcCounterCell(graph, cellName, cell);
                 break;
             case MC_SEQ_LOCK:
-                addMcSeqLockCell(graph, cell);
+                addMcSeqLockCell(graph, cellName, cell);
                 break;
             case MC_STATION_FSM:
-                addMcStationFsmCell(graph, cell);
+                addMcStationFsmCell(graph, cellName, cell);
                 break;
             default:
                 throw new MHDLException("Unsupported cell type: " + cell.type);
@@ -291,7 +292,7 @@ public class GraphBuilder {
         graph.addVertex(invGate);
     }
 
-    private static void addMcTimerCell(Graph graph, JCell cell) {
+    private static void addMcTimerCell(Graph graph, String cellName, JCell cell) {
         int ticks = parseParameter(cell, "TICKS", 60, 1, MAX_TIMER_TICKS);
 
         HashMap<String, Long> params = new HashMap<String, Long>();
@@ -300,10 +301,10 @@ public class GraphBuilder {
         ArrayList<Integer> inputNets = orderedSingleBitInputs(cell, "clk", "rst", "trigger_pulse");
         ArrayList<MacroOutput> outputs = singleBitOutputs(cell, "active");
 
-        addMacroVertices(graph, FunctionType.MC_TIMER, "mc_timer", params, inputNets, outputs);
+        addMacroVertices(graph, cellName, FunctionType.MC_TIMER, "mc_timer", params, inputNets, outputs);
     }
 
-    private static void addMcPeriodicCell(Graph graph, JCell cell) {
+    private static void addMcPeriodicCell(Graph graph, String cellName, JCell cell) {
         int period = parseParameter(cell, "PERIOD", 20, 1, MAX_PERIOD_TICKS);
 
         HashMap<String, Long> params = new HashMap<String, Long>();
@@ -312,19 +313,19 @@ public class GraphBuilder {
         ArrayList<Integer> inputNets = orderedSingleBitInputs(cell, "clk", "rst", "enable");
         ArrayList<MacroOutput> outputs = singleBitOutputs(cell, "pulse");
 
-        addMacroVertices(graph, FunctionType.MC_PERIODIC, "mc_periodic", params, inputNets, outputs);
+        addMacroVertices(graph, cellName, FunctionType.MC_PERIODIC, "mc_periodic", params, inputNets, outputs);
     }
 
-    private static void addMcLatchCell(Graph graph, JCell cell) {
+    private static void addMcLatchCell(Graph graph, String cellName, JCell cell) {
         HashMap<String, Long> params = new HashMap<String, Long>();
 
         ArrayList<Integer> inputNets = orderedSingleBitInputs(cell, "clk", "rst", "set_pulse", "clear_pulse");
         ArrayList<MacroOutput> outputs = singleBitOutputs(cell, "q");
 
-        addMacroVertices(graph, FunctionType.MC_LATCH, "mc_latch", params, inputNets, outputs);
+        addMacroVertices(graph, cellName, FunctionType.MC_LATCH, "mc_latch", params, inputNets, outputs);
     }
 
-    private static void addMcCounterCell(Graph graph, JCell cell) {
+    private static void addMcCounterCell(Graph graph, String cellName, JCell cell) {
         int width = parseParameter(cell, "WIDTH", 8, 1, MAX_COUNTER_WIDTH);
 
         HashMap<String, Long> params = new HashMap<String, Long>();
@@ -333,10 +334,10 @@ public class GraphBuilder {
         ArrayList<Integer> inputNets = orderedSingleBitInputs(cell, "clk", "rst", "inc_pulse", "clear_pulse");
         ArrayList<MacroOutput> outputs = vectorOutputs(cell, "count", width);
 
-        addMacroVertices(graph, FunctionType.MC_COUNTER, "mc_counter", params, inputNets, outputs);
+        addMacroVertices(graph, cellName, FunctionType.MC_COUNTER, "mc_counter", params, inputNets, outputs);
     }
 
-    private static void addMcSeqLockCell(Graph graph, JCell cell) {
+    private static void addMcSeqLockCell(Graph graph, String cellName, JCell cell) {
         int btnCount = parseParameter(cell, "BTN_COUNT", 3, 1, MAX_BTN_COUNT);
         int seqLen = parseParameter(cell, "SEQ_LEN", 3, 1, MAX_SEQ_LEN);
         int latchSuccess = parseParameter(cell, "LATCH_SUCCESS", 1, 0, 1);
@@ -361,10 +362,10 @@ public class GraphBuilder {
         int progressWidth = ceilLog2(seqLen + 1);
         outputs.addAll(vectorOutputs(cell, "progress", progressWidth));
 
-        addMacroVertices(graph, FunctionType.MC_SEQ_LOCK, "mc_seq_lock", params, inputNets, outputs);
+        addMacroVertices(graph, cellName, FunctionType.MC_SEQ_LOCK, "mc_seq_lock", params, inputNets, outputs);
     }
 
-    private static void addMcStationFsmCell(Graph graph, JCell cell) {
+    private static void addMcStationFsmCell(Graph graph, String cellName, JCell cell) {
         int departTicks = parseParameter(cell, "DEPART_TICKS", 20, 1, MAX_DEPART_TICKS);
 
         HashMap<String, Long> params = new HashMap<String, Long>();
@@ -376,16 +377,16 @@ public class GraphBuilder {
         outputs.addAll(singleBitOutputs(cell, "occupied"));
         outputs.addAll(singleBitOutputs(cell, "depart_now"));
 
-        addMacroVertices(graph, FunctionType.MC_STATION_FSM, "mc_station_fsm", params, inputNets, outputs);
+        addMacroVertices(graph, cellName, FunctionType.MC_STATION_FSM, "mc_station_fsm", params, inputNets, outputs);
     }
 
-    private static void addMacroVertices(Graph graph, FunctionType type, String macroName, Map<String, Long> params, ArrayList<Integer> inputNets, ArrayList<MacroOutput> outputs) {
+    private static void addMacroVertices(Graph graph, String cellName, FunctionType type, String macroName, Map<String, Long> params, ArrayList<Integer> inputNets, ArrayList<MacroOutput> outputs) {
         if (outputs.isEmpty()) {
             throw new MHDLException("Macro " + macroName + " has no outputs");
         }
 
         for (MacroOutput out : outputs) {
-            MacroVertex macroVertex = new MacroVertex(nextCellId(), type, inputNets.size(), macroName, out.port, out.bitIndex, params);
+            MacroVertex macroVertex = new MacroVertex(nextCellId(), type, inputNets.size(), cellName, macroName, out.port, out.bitIndex, params, inputNets);
 
             for (int inNet : inputNets) {
                 putInToNet(inNet, macroVertex, graph);
@@ -653,6 +654,8 @@ public class GraphBuilder {
                         } else if (net == mux.s_net_num) {
                             mux.s_vertex = from;
                         }
+                    } else if (function instanceof MacroVertex) {
+                        ((MacroVertex) function).registerInputSource(net, from);
                     }
                 }
 

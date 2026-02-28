@@ -1,7 +1,7 @@
 package GraphBuilder.json_representations;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 
 /**
  * Created by Francis O'Brien - 4/3/2017 - 19:39
@@ -10,11 +10,11 @@ import java.util.HashMap;
 public class JCell extends Node{
 
     public String type;
-    public HashMap<String, String> parameters = new HashMap<String, String>();
-    public HashMap<String, String> port_directions;
-    public HashMap<String, ArrayList<Object>> connections;
+    public LinkedHashMap<String, String> parameters = new LinkedHashMap<String, String>();
+    public LinkedHashMap<String, String> port_directions;
+    public LinkedHashMap<String, ArrayList<Object>> connections;
 
-    public HashMap<String, JPort> ports = new HashMap<String, JPort>();
+    public LinkedHashMap<String, JPort> ports = new LinkedHashMap<String, JPort>();
 
     @Override
     public ArrayList<Object> getNets() {

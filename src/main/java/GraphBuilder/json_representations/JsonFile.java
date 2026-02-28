@@ -1,6 +1,6 @@
 package GraphBuilder.json_representations;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 
 /**
  * Created by Francis O'Brien - 4/3/2017 - 19:41
@@ -8,7 +8,7 @@ import java.util.HashMap;
 
 public class JsonFile {
 
-    public HashMap<String, Module> modules;
+    public LinkedHashMap<String, Module> modules;
 
     public void print(){
         for (Module m : modules.values()){

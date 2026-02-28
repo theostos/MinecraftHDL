@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -243,6 +244,77 @@ class MacroSubsetGraphBuilderTest {
         }
         assertNotNull(firstSeq);
         assertEquals(36L, firstSeq.getParams().get("EXPECT_IDX"));
+        assertEquals("u0", firstSeq.getInstanceName());
+    }
+
+    @Test
+    void expandedMacroBitVerticesKeepSameInstanceName() throws IOException {
+        String json = """
+                {
+                  "modules": {
+                    "top": {
+                      "attributes": {"top": "1"},
+                      "ports": {
+                        "clk": {"direction": "input", "bits": [2]},
+                        "rst": {"direction": "input", "bits": [3]},
+                        "inc": {"direction": "input", "bits": [4]},
+                        "clr": {"direction": "input", "bits": [5]},
+                        "count0": {"direction": "output", "bits": [6]},
+                        "count1": {"direction": "output", "bits": [7]},
+                        "count2": {"direction": "output", "bits": [8]},
+                        "count3": {"direction": "output", "bits": [9]}
+                      },
+                      "cells": {
+                        "uCounter": {
+                          "type": "mc_counter",
+                          "parameters": {
+                            "WIDTH": "00000000000000000000000000000100"
+                          },
+                          "port_directions": {
+                            "clk":"input",
+                            "rst":"input",
+                            "inc_pulse":"input",
+                            "clear_pulse":"input",
+                            "count":"output"
+                          },
+                          "connections": {
+                            "clk":[2],
+                            "rst":[3],
+                            "inc_pulse":[4],
+                            "clear_pulse":[5],
+                            "count":[6,7,8,9]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                """;
+
+        Graph graph = GraphBuilder.buildGraph(writeTempNetlist(json).toString());
+
+        String sharedName = null;
+        int seen = 0;
+        for (Vertex vertex : graph.getVertices()) {
+            if (vertex.getType() != MinecraftGraph.VertexType.FUNCTION) {
+                continue;
+            }
+            Function function = (Function) vertex;
+            if (function.getFunc_Type() != FunctionType.MC_COUNTER) {
+                continue;
+            }
+            MacroVertex macro = (MacroVertex) function;
+            if (sharedName == null) {
+                sharedName = macro.getInstanceName();
+            } else {
+                assertEquals(sharedName, macro.getInstanceName());
+            }
+            seen++;
+        }
+
+        assertFalse(sharedName == null || sharedName.isBlank());
+        assertEquals(4, seen);
+        assertEquals("uCounter", sharedName);
     }
 
     private static long countFunctions(Graph graph, FunctionType type) {

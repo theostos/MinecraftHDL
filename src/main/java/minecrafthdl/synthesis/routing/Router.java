@@ -56,6 +56,8 @@ public class Router {
             GatePins gate_pins = null;
             if (v.type == VertexType.FUNCTION && ((Function)v).func_type == FunctionType.MUX){
                 gate_pins = new MuxPins(bottom_gates.get(i), bottom_vertices.get(i), bottom_offset, false);
+            } else if (v.type == VertexType.FUNCTION && isMacroType(((Function) v).func_type)) {
+                gate_pins = new MacroPins(bottom_gates.get(i), bottom_vertices.get(i), bottom_offset, false);
             } else {
                 gate_pins = new GatePins(bottom_gates.get(i), bottom_vertices.get(i), bottom_offset, false);
             }
@@ -86,6 +88,15 @@ public class Router {
         rtn.pins_array = pins_array;
 
         return rtn;
+    }
+
+    private static boolean isMacroType(FunctionType type) {
+        return type == FunctionType.MC_TIMER
+                || type == FunctionType.MC_PERIODIC
+                || type == FunctionType.MC_LATCH
+                || type == FunctionType.MC_COUNTER
+                || type == FunctionType.MC_SEQ_LOCK
+                || type == FunctionType.MC_STATION_FSM;
     }
 
     public static HashMap<Integer, Net> initializeNets(ArrayList<Vertex> top_vertices, ArrayList<Vertex> bottom_vertices, HashMap<Vertex, GatePins> pin_map) {

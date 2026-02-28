@@ -59,6 +59,26 @@ public class GatePins {
         return pins.get(this.next_free_input_pin - 1);
     }
 
+    public Pin getInputPin(int index) {
+        if (this.top) {
+            throw new MHDLException("Cannot request input pin from top/output pin bank");
+        }
+        if (index < 0 || index >= this.pins.size()) {
+            throw new MHDLException("Input pin index out of range: " + index);
+        }
+        return this.pins.get(index);
+    }
+
+    public Pin getOutputPin(int index) {
+        if (!this.top) {
+            throw new MHDLException("Cannot request output pin from bottom/input pin bank");
+        }
+        if (index < 0 || index >= this.pins.size()) {
+            throw new MHDLException("Output pin index out of range: " + index);
+        }
+        return this.pins.get(index);
+    }
+
     public boolean hasNextPin(){
         return next_free_input_pin < this.pins.size();
     }
