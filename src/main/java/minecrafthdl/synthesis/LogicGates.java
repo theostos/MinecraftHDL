@@ -212,4 +212,64 @@ public class LogicGates {
 
         return gate;
     }
+
+    public static Gate MC_TIMER(int ticks, int outputBit) {
+        return macroModule(3, 2, "TIMER", ticks, outputBit);
+    }
+
+    public static Gate MC_PERIODIC(int period, int outputBit) {
+        return macroModule(3, 2, "PERIODIC", period, outputBit);
+    }
+
+    public static Gate MC_LATCH(int outputBit) {
+        return macroModule(4, 2, "LATCH", 0, outputBit);
+    }
+
+    public static Gate MC_COUNTER(int width, int outputBit) {
+        return macroModule(4, 2, "COUNTER", width, outputBit);
+    }
+
+    public static Gate MC_SEQ_LOCK(int btnCount, int seqLen, int latchSuccess, int outputBit) {
+        int inputs = 3 + btnCount;
+        int tagValue = (seqLen << 1) | (latchSuccess & 1);
+        return macroModule(inputs, 2, "SEQLOCK", tagValue, outputBit);
+    }
+
+    public static Gate MC_STATION_FSM(int departTicks, int outputBit) {
+        return macroModule(5, 2, "STATION", departTicks, outputBit);
+    }
+
+    private static Gate macroModule(int inputs, int passthroughInput, String tag, int paramValue, int outputBit) {
+        if (inputs < 1) {
+            throw new MHDLException("Macro module requires at least one input");
+        }
+
+        int width = inputs == 1 ? 1 : (inputs * 2) - 1;
+        int inputSpacing = inputs == 1 ? 0 : 1;
+        Gate gate = new Gate(width, 2, 4, inputs, 1, inputSpacing, 0, new int[]{0});
+
+        int selectedInput = Math.max(0, Math.min(inputs - 1, passthroughInput));
+        int selectedX = selectedInput * (1 + inputSpacing);
+
+        for (int i = 0; i < inputs; i++) {
+            int x = i * (1 + inputSpacing);
+            gate.setBlock(x, 0, 0, Blocks.WHITE_WOOL.defaultBlockState());
+            gate.setBlock(x, 0, 1, Blocks.WHITE_WOOL.defaultBlockState());
+            gate.setBlock(x, 1, 1, Blocks.REDSTONE_WIRE.defaultBlockState());
+        }
+
+        gate.setBlock(selectedX, 0, 2, Blocks.WHITE_WOOL.defaultBlockState());
+        gate.setBlock(selectedX, 1, 2, Blocks.REDSTONE_WIRE.defaultBlockState());
+        gate.setBlock(selectedX, 0, 3, Utils.repeater(Direction.NORTH));
+
+        int markerX = width - 1;
+        gate.setBlock(markerX, 0, 2, Blocks.GRAY_WOOL.defaultBlockState());
+        if (((paramValue + outputBit + tag.length()) & 1) == 0) {
+            gate.setBlock(markerX, 1, 2, Blocks.REDSTONE_TORCH.defaultBlockState());
+        } else {
+            gate.setBlock(markerX, 1, 2, Blocks.AIR.defaultBlockState());
+        }
+
+        return gate;
+    }
 }

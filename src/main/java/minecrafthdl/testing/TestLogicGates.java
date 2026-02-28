@@ -20,10 +20,21 @@ public class TestLogicGates extends LogicGates {
         ic.printLayers();
     }
 
-    public static Gate IO(){
-        TestGate gate = new TestGate(1, 1, 1, 1, 1, 0, 0, new int[]{0});
+    private static Gate unitGate(int numInputs, int numOutputs) {
+        int inputWidth = numInputs <= 1 ? 1 : (numInputs * 2) - 1;
+        int outputWidth = numOutputs <= 1 ? 1 : (numOutputs * 2) - 1;
+        int width = Math.max(1, Math.max(inputWidth, outputWidth));
+
+        int inputSpacing = numInputs <= 1 ? 0 : 1;
+        int outputSpacing = numOutputs <= 1 ? 0 : 1;
+
+        TestGate gate = new TestGate(width, 1, 1, numInputs, numOutputs, inputSpacing, outputSpacing, new int[]{0});
         gate.setBlock(0, 0, 0, "x");
         return gate;
+    }
+
+    public static Gate IO(){
+        return unitGate(1, 1);
     }
 
     public static Gate NOT(){
@@ -106,5 +117,48 @@ public class TestLogicGates extends LogicGates {
         return gate;
     }
 
+    public static Gate XOR() {
+        return unitGate(2, 1);
+    }
+
+    public static Gate MUX() {
+        return unitGate(3, 1);
+    }
+
+    public static Gate HIGH() {
+        return unitGate(1, 1);
+    }
+
+    public static Gate LOW() {
+        return unitGate(1, 1);
+    }
+
+    public static Gate D_LATCH() {
+        return unitGate(2, 1);
+    }
+
+    public static Gate MC_TIMER() {
+        return unitGate(3, 1);
+    }
+
+    public static Gate MC_PERIODIC() {
+        return unitGate(3, 1);
+    }
+
+    public static Gate MC_LATCH() {
+        return unitGate(4, 1);
+    }
+
+    public static Gate MC_COUNTER() {
+        return unitGate(4, 1);
+    }
+
+    public static Gate MC_SEQ_LOCK(int btnCount) {
+        return unitGate(3 + Math.max(1, btnCount), 1);
+    }
+
+    public static Gate MC_STATION_FSM() {
+        return unitGate(5, 1);
+    }
 
 }
