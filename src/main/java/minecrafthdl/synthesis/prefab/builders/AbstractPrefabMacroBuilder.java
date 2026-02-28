@@ -1,8 +1,13 @@
 package minecrafthdl.synthesis.prefab.builders;
 
+import MinecraftGraph.Graph;
+import MinecraftGraph.In_output;
+import MinecraftGraph.Vertex;
+import MinecraftGraph.VertexType;
 import minecrafthdl.MHDLException;
 import minecrafthdl.synthesis.Circuit;
 import minecrafthdl.synthesis.Gate;
+import minecrafthdl.synthesis.IntermediateCircuit;
 import minecrafthdl.synthesis.prefab.PrefabMacroGateFactory;
 import net.minecraft.world.level.block.Blocks;
 
@@ -115,5 +120,45 @@ public abstract class AbstractPrefabMacroBuilder implements PrefabMacroBuilder {
         }
         gate.setBlock(0, 1, 1, Blocks.OAK_SIGN.defaultBlockState());
         gate.addSignPlacement(new Circuit.SignPlacement(0, 1, 1, text));
+    }
+
+    protected static In_output input(String name) {
+        return new In_output(1, VertexType.INPUT, name);
+    }
+
+    protected static In_output output(String name) {
+        return new In_output(1, VertexType.OUTPUT, name);
+    }
+
+    protected static void wire(Graph graph, Vertex from, Vertex to) {
+        graph.addEdge(from, to);
+    }
+
+    protected static Gate synthesizeSubgraphAsGate(Graph graph, int inputCount) {
+        boolean previousTestMode = Circuit.TEST;
+        Circuit.TEST = false;
+        try {
+            IntermediateCircuit intermediate = new IntermediateCircuit();
+            intermediate.loadGraph(graph);
+            intermediate.buildGates();
+            intermediate.routeChannels();
+            Circuit circuit = intermediate.genCircuit();
+
+            int spacing = inputCount <= 1 ? 0 : 1;
+            Gate gate = new Gate(
+                    circuit.getSizeX(),
+                    circuit.getSizeY(),
+                    circuit.getSizeZ(),
+                    Math.max(1, inputCount),
+                    1,
+                    spacing,
+                    0,
+                    new int[]{0}
+            );
+            gate.insertCircuit(0, 0, 0, circuit);
+            return gate;
+        } finally {
+            Circuit.TEST = previousTestMode;
+        }
     }
 }

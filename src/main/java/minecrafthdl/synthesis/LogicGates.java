@@ -23,8 +23,10 @@ public class LogicGates {
         gate.is_io = true;
 
         gate.setBlock(0, 0, 0, Blocks.WHITE_WOOL.defaultBlockState());
-        gate.setBlock(0, 1, 0, Utils.standingSignRotation(8));
-        gate.addSignPlacement(new Circuit.SignPlacement(0, 1, 0, id));
+        if (id != null && !id.isBlank()) {
+            gate.setBlock(0, 1, 0, Utils.standingSignRotation(8));
+            gate.addSignPlacement(new Circuit.SignPlacement(0, 1, 0, id));
+        }
         return gate;
     }
 
@@ -33,8 +35,10 @@ public class LogicGates {
         gate.is_io = true;
 
         gate.setBlock(0, 0, 0, Blocks.REDSTONE_LAMP.defaultBlockState());
-        gate.setBlock(0, 1, 0, Utils.standingSignRotation(0));
-        gate.addSignPlacement(new Circuit.SignPlacement(0, 1, 0, id));
+        if (id != null && !id.isBlank()) {
+            gate.setBlock(0, 1, 0, Utils.standingSignRotation(0));
+            gate.addSignPlacement(new Circuit.SignPlacement(0, 1, 0, id));
+        }
         return gate;
     }
 

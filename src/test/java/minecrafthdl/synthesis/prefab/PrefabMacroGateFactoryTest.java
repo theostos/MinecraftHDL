@@ -1,12 +1,16 @@
 package minecrafthdl.synthesis.prefab;
 
 import minecrafthdl.MHDLException;
+import minecrafthdl.synthesis.Gate;
+import net.minecraft.SharedConstants;
+import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PrefabMacroGateFactoryTest {
 
@@ -88,5 +92,23 @@ class PrefabMacroGateFactoryTest {
                 "u0", "mc_station_fsm", 4, params, "occupied", 0
         );
         assertThrows(MHDLException.class, () -> PrefabMacroGateFactory.tryBuild(invalid));
+    }
+
+    @Test
+    void latchBuilderGeneratesCompositeGateNotSimpleShell() {
+        bootstrapMinecraft();
+        PrefabMacroGateFactory.Request request = new PrefabMacroGateFactory.Request(
+                "u0", "mc_latch", 4, new LinkedHashMap<String, Long>(), "q", 0
+        );
+
+        Gate gate = PrefabMacroGateFactory.tryBuild(request);
+        assertTrue(gate != null);
+        assertTrue(gate.getSizeZ() > 6);
+        assertTrue(gate.getSizeX() > 7);
+    }
+
+    private static void bootstrapMinecraft() {
+        SharedConstants.tryDetectVersion();
+        Bootstrap.bootStrap();
     }
 }
