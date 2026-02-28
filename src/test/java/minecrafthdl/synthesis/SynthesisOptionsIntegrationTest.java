@@ -16,7 +16,6 @@ class SynthesisOptionsIntegrationTest {
     @Test
     void defaultsExposeExpectedContractValues() {
         SynthesisOptions defaults = SynthesisOptions.defaults();
-        assertEquals(false, defaults.prefabMacrosEnabled());
         assertEquals(2, defaults.prefabAutoClockPeriodTicks());
         assertEquals(10000, defaults.prefabMacroTotalBlockBudget());
         assertEquals(2000, defaults.prefabMacroPerInstanceBlockBudget());
@@ -26,7 +25,7 @@ class SynthesisOptionsIntegrationTest {
     void prefabBudgetCanFailSynthesisEarly() throws IOException {
         Circuit.TEST = true;
         try {
-            IntermediateCircuit circuit = new IntermediateCircuit(new SynthesisOptions(true, 2, 10, 5));
+            IntermediateCircuit circuit = new IntermediateCircuit(new SynthesisOptions(2, 10, 5));
             circuit.loadGraph(GraphBuilder.buildGraph(writeTempNetlist(timerNetlist()).toString()));
             circuit.buildGates();
             circuit.routeChannels();
@@ -53,7 +52,7 @@ class SynthesisOptionsIntegrationTest {
     private static void assertPrefabModeHasNoRuntimePlacements(String json) throws IOException {
         Circuit.TEST = true;
         try {
-            IntermediateCircuit circuit = new IntermediateCircuit(new SynthesisOptions(true, 2, 10000, 2000));
+            IntermediateCircuit circuit = new IntermediateCircuit(new SynthesisOptions(2, 10000, 2000));
             circuit.loadGraph(GraphBuilder.buildGraph(writeTempNetlist(json).toString()));
             circuit.buildGates();
             circuit.routeChannels();

@@ -392,10 +392,6 @@ public class IntermediateCircuit {
     }
 
     private void enforceSynthesisBudgets(Circuit circuit) {
-        if (!this.options.prefabMacrosEnabled()) {
-            return;
-        }
-
         long estimatedTotal = (long) circuit.getSizeX() * (long) circuit.getSizeY() * (long) circuit.getSizeZ();
         if (estimatedTotal > this.options.prefabMacroTotalBlockBudget()) {
             throw new MHDLException(

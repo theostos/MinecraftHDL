@@ -1,6 +1,5 @@
 package minecrafthdl.synthesis;
 
-import minecrafthdl.block.entity.MacroRuntimeBlockEntity;
 import net.minecraft.network.chat.Component;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -156,16 +155,6 @@ public class Circuit {
                     startZ + entry.getKey().getZ()
             );
             level.setBlockAndUpdate(blockPos, entry.getValue());
-        }
-
-        String originKey = startX + "," + startY + "," + startZ;
-        for (MacroPlacement placement : this.macroPlacements) {
-            BlockPos blockPos = new BlockPos(startX + placement.x, startY + placement.y, startZ + placement.z);
-            if (level.getBlockEntity(blockPos) instanceof MacroRuntimeBlockEntity macroEntity) {
-                macroEntity.configure(placement, originKey);
-                BlockState state = level.getBlockState(blockPos);
-                level.sendBlockUpdated(blockPos, state, state, Block.UPDATE_CLIENTS);
-            }
         }
 
         for (SignPlacement placement : this.signPlacements) {

@@ -3,8 +3,6 @@ package minecrafthdl.synthesis;
 import minecrafthdl.Demo;
 import minecrafthdl.MHDLException;
 import minecrafthdl.Utils;
-import minecrafthdl.block.ModBlocks;
-import minecrafthdl.block.blocks.MacroRuntimeBlock;
 import minecrafthdl.synthesis.prefab.PrefabMacroGateFactory;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Blocks;
@@ -234,11 +232,7 @@ public class LogicGates {
         params.put("TICKS", (long) ticks);
         params.put("AUTO_CLK", 1L);
         params.put("AUTO_CLK_PERIOD_TICKS", (long) options.prefabAutoClockPeriodTicks());
-        Gate prefab = macroPrefabOrNull(instanceName, "mc_timer", 3, params, outputPort, outputBit, options);
-        if (prefab != null) {
-            return prefab;
-        }
-        return macroModule(instanceName, "mc_timer", 3, params, outputPort, outputBit);
+        return macroPrefabOrThrow(instanceName, "mc_timer", 3, params, outputPort, outputBit);
     }
 
     public static Gate MC_PERIODIC(int period, String outputPort, int outputBit) {
@@ -254,11 +248,7 @@ public class LogicGates {
         params.put("PERIOD", (long) period);
         params.put("AUTO_CLK", 1L);
         params.put("AUTO_CLK_PERIOD_TICKS", (long) options.prefabAutoClockPeriodTicks());
-        Gate prefab = macroPrefabOrNull(instanceName, "mc_periodic", 3, params, outputPort, outputBit, options);
-        if (prefab != null) {
-            return prefab;
-        }
-        return macroModule(instanceName, "mc_periodic", 3, params, outputPort, outputBit);
+        return macroPrefabOrThrow(instanceName, "mc_periodic", 3, params, outputPort, outputBit);
     }
 
     public static Gate MC_LATCH(String outputPort, int outputBit) {
@@ -273,11 +263,7 @@ public class LogicGates {
         HashMap<String, Long> params = new HashMap<String, Long>();
         params.put("AUTO_CLK", 1L);
         params.put("AUTO_CLK_PERIOD_TICKS", (long) options.prefabAutoClockPeriodTicks());
-        Gate prefab = macroPrefabOrNull(instanceName, "mc_latch", 4, params, outputPort, outputBit, options);
-        if (prefab != null) {
-            return prefab;
-        }
-        return macroModule(instanceName, "mc_latch", 4, params, outputPort, outputBit);
+        return macroPrefabOrThrow(instanceName, "mc_latch", 4, params, outputPort, outputBit);
     }
 
     public static Gate MC_COUNTER(int width, String outputPort, int outputBit) {
@@ -293,11 +279,7 @@ public class LogicGates {
         params.put("WIDTH", (long) width);
         params.put("AUTO_CLK", 1L);
         params.put("AUTO_CLK_PERIOD_TICKS", (long) options.prefabAutoClockPeriodTicks());
-        Gate prefab = macroPrefabOrNull(instanceName, "mc_counter", 4, params, outputPort, outputBit, options);
-        if (prefab != null) {
-            return prefab;
-        }
-        return macroModule(instanceName, "mc_counter", 4, params, outputPort, outputBit);
+        return macroPrefabOrThrow(instanceName, "mc_counter", 4, params, outputPort, outputBit);
     }
 
     public static Gate MC_SEQ_LOCK(int btnCount, int seqLen, int latchSuccess, long expectIdx, String outputPort, int outputBit) {
@@ -317,11 +299,7 @@ public class LogicGates {
         params.put("EXPECT_IDX", expectIdx);
         params.put("AUTO_CLK", 1L);
         params.put("AUTO_CLK_PERIOD_TICKS", (long) options.prefabAutoClockPeriodTicks());
-        Gate prefab = macroPrefabOrNull(instanceName, "mc_seq_lock", inputs, params, outputPort, outputBit, options);
-        if (prefab != null) {
-            return prefab;
-        }
-        return macroModule(instanceName, "mc_seq_lock", inputs, params, outputPort, outputBit);
+        return macroPrefabOrThrow(instanceName, "mc_seq_lock", inputs, params, outputPort, outputBit);
     }
 
     public static Gate MC_STATION_FSM(int departTicks, String outputPort, int outputBit) {
@@ -337,26 +315,18 @@ public class LogicGates {
         params.put("DEPART_TICKS", (long) departTicks);
         params.put("AUTO_CLK", 1L);
         params.put("AUTO_CLK_PERIOD_TICKS", (long) options.prefabAutoClockPeriodTicks());
-        Gate prefab = macroPrefabOrNull(instanceName, "mc_station_fsm", 5, params, outputPort, outputBit, options);
-        if (prefab != null) {
-            return prefab;
-        }
-        return macroModule(instanceName, "mc_station_fsm", 5, params, outputPort, outputBit);
+        return macroPrefabOrThrow(instanceName, "mc_station_fsm", 5, params, outputPort, outputBit);
     }
 
-    private static Gate macroPrefabOrNull(
+    private static Gate macroPrefabOrThrow(
             String instanceName,
             String macroName,
             int inputCount,
             Map<String, Long> params,
             String outputPort,
-            int outputBit,
-            SynthesisOptions options
+            int outputBit
     ) {
-        if (options == null || !options.prefabMacrosEnabled()) {
-            return null;
-        }
-        return PrefabMacroGateFactory.tryBuild(
+        Gate prefab = PrefabMacroGateFactory.tryBuild(
                 new PrefabMacroGateFactory.Request(
                         instanceName,
                         macroName,
@@ -366,38 +336,9 @@ public class LogicGates {
                         outputBit
                 )
         );
-    }
-
-    private static Gate macroModule(String instanceName, String macroName, int inputs, HashMap<String, Long> params, String outputPort, int outputBit) {
-        if (inputs < 1) {
-            throw new MHDLException("Macro module requires at least one input");
+        if (prefab == null) {
+            throw new MHDLException("No prefab builder available for macro: " + macroName);
         }
-
-        int width = inputs == 1 ? 1 : (inputs * 2) - 1;
-        int inputSpacing = inputs == 1 ? 0 : 1;
-        Gate gate = new Gate(width, 1, 4, inputs, 1, inputSpacing, 0, new int[]{0});
-
-        for (int i = 0; i < inputs; i++) {
-            int x = i * (1 + inputSpacing);
-            gate.setBlock(x, 0, 0, Blocks.REDSTONE_WIRE.defaultBlockState());
-        }
-
-        gate.setBlock(0, 0, 2, ModBlocks.MACRO_RUNTIME.get().defaultBlockState().setValue(MacroRuntimeBlock.POWERED, Boolean.FALSE));
-        gate.setBlock(0, 0, 3, Blocks.REDSTONE_WIRE.defaultBlockState());
-
-        gate.addMacroPlacement(new Circuit.MacroPlacement(
-                0,
-                0,
-                2,
-                instanceName,
-                macroName,
-                outputPort,
-                outputBit,
-                inputs,
-                inputSpacing == 0 ? 1 : 2,
-                params
-        ));
-
-        return gate;
+        return prefab;
     }
 }

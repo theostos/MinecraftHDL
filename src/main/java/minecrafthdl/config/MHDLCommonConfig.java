@@ -5,7 +5,6 @@ import net.minecraftforge.common.ForgeConfigSpec;
 public final class MHDLCommonConfig {
 
     public static final ForgeConfigSpec SPEC;
-    private static final ForgeConfigSpec.BooleanValue PREFAB_MACROS_ENABLED;
     private static final ForgeConfigSpec.IntValue PREFAB_AUTO_CLOCK_PERIOD_TICKS;
     private static final ForgeConfigSpec.IntValue PREFAB_MACRO_TOTAL_BLOCK_BUDGET;
     private static final ForgeConfigSpec.IntValue PREFAB_MACRO_PER_INSTANCE_BLOCK_BUDGET;
@@ -13,10 +12,6 @@ public final class MHDLCommonConfig {
     static {
         ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
         builder.push("prefabMacros");
-
-        PREFAB_MACROS_ENABLED = builder
-                .comment("Enable prefab macro synthesis path. Runtime macro execution remains default while this is false.")
-                .define("enabled", false);
 
         PREFAB_AUTO_CLOCK_PERIOD_TICKS = builder
                 .comment("Internal prefab macro clock period in game ticks.")
@@ -35,10 +30,6 @@ public final class MHDLCommonConfig {
     }
 
     private MHDLCommonConfig() {
-    }
-
-    public static boolean prefabMacrosEnabled() {
-        return PREFAB_MACROS_ENABLED.get();
     }
 
     public static int prefabAutoClockPeriodTicks() {
