@@ -9,6 +9,9 @@ public final class McPeriodicPrefabBuilder extends AbstractPrefabMacroBuilder {
     public Gate build(PrefabMacroGateFactory.Request request) {
         int period = intParam(request, "PERIOD", 20);
         requireRange("mc_periodic", "PERIOD", period, 1, 1200);
-        return null;
+        Gate gate = oneOutputShell(3, 6);
+        routeOutputFromInput(gate, 2); // enable passthrough in prefab phase-A scaffold.
+        addLabel(gate, "mc_periodic");
+        return gate;
     }
 }

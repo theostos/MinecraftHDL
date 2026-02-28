@@ -59,6 +59,29 @@ public abstract class AbstractPrefabMacroBuilder implements PrefabMacroBuilder {
         return gate;
     }
 
+    protected static void routeOutputFromInput(Gate gate, int inputIndex) {
+        if (gate == null || gate.num_inputs <= 0) {
+            return;
+        }
+        int clamped = Math.max(0, Math.min(gate.num_inputs - 1, inputIndex));
+        int inputX = clamped * (1 + gate.input_spacing);
+        int outputZ = gate.getSizeZ() - 1;
+
+        for (int z = 0; z <= outputZ; z++) {
+            gate.setBlock(inputX, 1, z, Blocks.REDSTONE_WIRE.defaultBlockState());
+            gate.setBlock(inputX, 0, z, Blocks.WHITE_WOOL.defaultBlockState());
+        }
+
+        int step = inputX <= 0 ? -1 : 1;
+        for (int x = inputX; x != 0; x -= step) {
+            gate.setBlock(x, 1, outputZ, Blocks.REDSTONE_WIRE.defaultBlockState());
+            gate.setBlock(x, 0, outputZ, Blocks.WHITE_WOOL.defaultBlockState());
+        }
+
+        gate.setBlock(0, 1, outputZ, Blocks.REDSTONE_WIRE.defaultBlockState());
+        gate.setBlock(0, 0, outputZ, Blocks.WHITE_WOOL.defaultBlockState());
+    }
+
     protected static void addLabel(Gate gate, String text) {
         if (gate == null || text == null || text.isBlank()) {
             return;
