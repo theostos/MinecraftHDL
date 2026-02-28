@@ -93,6 +93,7 @@ Supported macro modules are:
 - `mc_counter`
 - `mc_seq_lock`
 - `mc_station_fsm`
+These macros are executed by dedicated runtime macro cells during in-game simulation, including parameterized behavior (e.g. `EXPECT_IDX` for `mc_seq_lock`).
  
 MinecraftHDL is an educational tool to illustrate on a macro-scopic scale how microelectronic digital circuits are designed and produced. It is a great way to introduce younger audiences to the world of digital design and can also be used to illustrate the difference between software and hardware design to undergraduate engineers taking their first RTL class.
 
