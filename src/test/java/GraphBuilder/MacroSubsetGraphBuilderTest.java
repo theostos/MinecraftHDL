@@ -3,6 +3,7 @@ package GraphBuilder;
 import MinecraftGraph.Function;
 import MinecraftGraph.FunctionType;
 import MinecraftGraph.Graph;
+import MinecraftGraph.MacroVertex;
 import MinecraftGraph.Vertex;
 import minecrafthdl.MHDLException;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class MacroSubsetGraphBuilderTest {
@@ -173,6 +175,74 @@ class MacroSubsetGraphBuilderTest {
 
         Path netlist = writeTempNetlist(json);
         assertThrows(MHDLException.class, () -> GraphBuilder.buildGraph(netlist.toString()));
+    }
+
+    @Test
+    void buildGraphParsesSeqLockExpectIdxParameter() throws IOException {
+        String json = """
+                {
+                  "modules": {
+                    "top": {
+                      "attributes": {"top": "1"},
+                      "ports": {
+                        "clk": {"direction": "input", "bits": [2]},
+                        "rst": {"direction": "input", "bits": [3]},
+                        "clr": {"direction": "input", "bits": [4]},
+                        "b0": {"direction": "input", "bits": [5]},
+                        "b1": {"direction": "input", "bits": [6]},
+                        "b2": {"direction": "input", "bits": [7]},
+                        "ok": {"direction": "output", "bits": [8]}
+                      },
+                      "cells": {
+                        "u0": {
+                          "type": "mc_seq_lock",
+                          "parameters": {
+                            "BTN_COUNT": "00000000000000000000000000000011",
+                            "SEQ_LEN": "00000000000000000000000000000011",
+                            "LATCH_SUCCESS": "00000000000000000000000000000001",
+                            "EXPECT_IDX": "00000000000000000000000000100100"
+                          },
+                          "port_directions": {
+                            "clk":"input",
+                            "rst":"input",
+                            "clear":"input",
+                            "btn_pulse":"input",
+                            "unlocked":"output",
+                            "correct_pulse":"output",
+                            "wrong_pulse":"output",
+                            "progress":"output"
+                          },
+                          "connections": {
+                            "clk":[2],
+                            "rst":[3],
+                            "clear":[4],
+                            "btn_pulse":[5,6,7],
+                            "unlocked":[8],
+                            "correct_pulse":[9],
+                            "wrong_pulse":[10],
+                            "progress":[11,12]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                """;
+
+        Graph graph = GraphBuilder.buildGraph(writeTempNetlist(json).toString());
+        MacroVertex firstSeq = null;
+        for (Vertex vertex : graph.getVertices()) {
+            if (vertex.getType() != MinecraftGraph.VertexType.FUNCTION) {
+                continue;
+            }
+            Function function = (Function) vertex;
+            if (function.getFunc_Type() == FunctionType.MC_SEQ_LOCK) {
+                firstSeq = (MacroVertex) function;
+                break;
+            }
+        }
+        assertNotNull(firstSeq);
+        assertEquals(36L, firstSeq.getParams().get("EXPECT_IDX"));
     }
 
     private static long countFunctions(Graph graph, FunctionType type) {
