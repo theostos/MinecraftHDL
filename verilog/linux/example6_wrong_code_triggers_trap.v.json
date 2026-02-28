@@ -1,0 +1,185 @@
+{
+  "creator": "Yosys 0.33 (git sha1 2584903a060)",
+  "modules": {
+    "top": {
+      "attributes": {
+        "src": "./autoyosys/tmp.v:19.1-42.10"
+      },
+      "ports": {
+        "clk": {
+          "direction": "input",
+          "bits": [ 2 ]
+        },
+        "rst": {
+          "direction": "input",
+          "bits": [ 3 ]
+        },
+        "a_pressed": {
+          "direction": "input",
+          "bits": [ 4 ]
+        },
+        "b_pressed": {
+          "direction": "input",
+          "bits": [ 5 ]
+        },
+        "c_pressed": {
+          "direction": "input",
+          "bits": [ 6 ]
+        },
+        "trap": {
+          "direction": "output",
+          "bits": [ 7 ]
+        },
+        "reward": {
+          "direction": "output",
+          "bits": [ 8 ]
+        }
+      },
+      "cells": {
+        "u_sequencelock_1": {
+          "hide_name": 0,
+          "type": "mc_seq_lock",
+          "parameters": {
+            "BTN_COUNT": "00000000000000000000000000000011",
+            "EXPECT_IDX": "00000000000000000000000000100100",
+            "LATCH_SUCCESS": "00000000000000000000000000000001",
+            "SEQ_LEN": "00000000000000000000000000000011"
+          },
+          "attributes": {
+            "module_not_derived": "00000000000000000000000000000001",
+            "src": "./autoyosys/tmp.v:41.81-41.376"
+          },
+          "port_directions": {
+            "btn_pulse": "input",
+            "clear": "input",
+            "clk": "input",
+            "correct_pulse": "output",
+            "progress": "output",
+            "rst": "input",
+            "unlocked": "output",
+            "wrong_pulse": "output"
+          },
+          "connections": {
+            "btn_pulse": [ 4, 5, 6 ],
+            "clear": [ "0" ],
+            "clk": [ 2 ],
+            "correct_pulse": [ 9 ],
+            "progress": [ 10, 11 ],
+            "rst": [ 3 ],
+            "unlocked": [ 8 ],
+            "wrong_pulse": [ 7 ]
+          }
+        }
+      },
+      "netnames": {
+        "__act_0": {
+          "hide_name": 0,
+          "bits": [ 7 ],
+          "attributes": {
+            "src": "./autoyosys/tmp.v:27.8-27.15"
+          }
+        },
+        "__act_1": {
+          "hide_name": 0,
+          "bits": [ 8 ],
+          "attributes": {
+            "src": "./autoyosys/tmp.v:28.8-28.15"
+          }
+        },
+        "__m_sequencelock_1_correct_pulse": {
+          "hide_name": 0,
+          "bits": [ 9 ],
+          "attributes": {
+            "src": "./autoyosys/tmp.v:29.8-29.40",
+            "unused_bits": "0 "
+          }
+        },
+        "__m_sequencelock_1_progress": {
+          "hide_name": 0,
+          "bits": [ 10, 11 ],
+          "attributes": {
+            "src": "./autoyosys/tmp.v:30.14-30.41",
+            "unused_bits": "0 1"
+          }
+        },
+        "__m_sequencelock_1_unlocked": {
+          "hide_name": 0,
+          "bits": [ 8 ],
+          "attributes": {
+            "src": "./autoyosys/tmp.v:31.8-31.35"
+          }
+        },
+        "__m_sequencelock_1_wrong_pulse": {
+          "hide_name": 0,
+          "bits": [ 7 ],
+          "attributes": {
+            "src": "./autoyosys/tmp.v:32.8-32.38"
+          }
+        },
+        "__w_u_sequencelock_1_btn_pulse": {
+          "hide_name": 0,
+          "bits": [ 4, 5, 6 ],
+          "attributes": {
+            "src": "./autoyosys/tmp.v:33.14-33.44"
+          }
+        },
+        "__w_u_sequencelock_1_clear": {
+          "hide_name": 0,
+          "bits": [ "0" ],
+          "attributes": {
+            "src": "./autoyosys/tmp.v:34.8-34.34"
+          }
+        },
+        "a_pressed": {
+          "hide_name": 0,
+          "bits": [ 4 ],
+          "attributes": {
+            "src": "./autoyosys/tmp.v:22.14-22.23"
+          }
+        },
+        "b_pressed": {
+          "hide_name": 0,
+          "bits": [ 5 ],
+          "attributes": {
+            "src": "./autoyosys/tmp.v:23.14-23.23"
+          }
+        },
+        "c_pressed": {
+          "hide_name": 0,
+          "bits": [ 6 ],
+          "attributes": {
+            "src": "./autoyosys/tmp.v:24.14-24.23"
+          }
+        },
+        "clk": {
+          "hide_name": 0,
+          "bits": [ 2 ],
+          "attributes": {
+            "src": "./autoyosys/tmp.v:20.14-20.17"
+          }
+        },
+        "reward": {
+          "hide_name": 0,
+          "bits": [ 8 ],
+          "attributes": {
+            "src": "./autoyosys/tmp.v:26.15-26.21"
+          }
+        },
+        "rst": {
+          "hide_name": 0,
+          "bits": [ 3 ],
+          "attributes": {
+            "src": "./autoyosys/tmp.v:21.14-21.17"
+          }
+        },
+        "trap": {
+          "hide_name": 0,
+          "bits": [ 7 ],
+          "attributes": {
+            "src": "./autoyosys/tmp.v:25.15-25.19"
+          }
+        }
+      }
+    }
+  }
+}

@@ -93,7 +93,20 @@ Supported macro modules are:
 - `mc_counter`
 - `mc_seq_lock`
 - `mc_station_fsm`
-These macros are executed by dedicated runtime macro cells during in-game simulation, including parameterized behavior (e.g. `EXPECT_IDX` for `mc_seq_lock`).
+
+Macro behavior contract is documented in:
+- `markdown/PREFAB_MACRO_SPEC.md`
+
+Cycle-accurate macro simulation (without launching Minecraft) is covered by tests in:
+- `src/test/java/minecrafthdl/simulation/prefab/`
+
+Prefab-macro transition options are available through Forge common config:
+- `prefabMacros.enabled` (default `false`)
+- `prefabMacros.autoClockPeriodTicks` (default `2`)
+- `prefabMacros.totalBlockBudget` (default `10000`)
+- `prefabMacros.perInstanceBlockBudget` (default `2000`)
+
+While `prefabMacros.enabled=false`, macro execution remains on the existing runtime macro path for in-game generation.
  
 MinecraftHDL is an educational tool to illustrate on a macro-scopic scale how microelectronic digital circuits are designed and produced. It is a great way to introduce younger audiences to the world of digital design and can also be used to illustrate the difference between software and hardware design to undergraduate engineers taking their first RTL class.
 
