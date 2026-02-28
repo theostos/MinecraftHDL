@@ -13,6 +13,16 @@ public final class McSeqLockPrefabBuilder extends AbstractPrefabMacroBuilder {
         requireRange("mc_seq_lock", "BTN_COUNT", btnCount, 1, 8);
         requireRange("mc_seq_lock", "SEQ_LEN", seqLen, 1, 16);
         requireRange("mc_seq_lock", "LATCH_SUCCESS", latchSuccess, 0, 1);
-        return null;
+
+        Gate gate = oneOutputShell(3 + btnCount, 7);
+        int firstButtonInputIndex = 3;
+        if ("wrong_pulse".equals(request.outputPort)) {
+            int secondButtonInputIndex = Math.min((3 + btnCount) - 1, 4);
+            routeOutputFromInput(gate, secondButtonInputIndex);
+        } else {
+            routeOutputFromInput(gate, firstButtonInputIndex);
+        }
+        addLabel(gate, "mc_seq_lock." + request.outputPort + "[" + request.outputBit + "]");
+        return gate;
     }
 }

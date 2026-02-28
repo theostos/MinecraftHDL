@@ -43,6 +43,13 @@ class SynthesisOptionsIntegrationTest {
         assertPrefabModeHasNoRuntimePlacements(latchNetlist());
     }
 
+    @Test
+    void prefabModePassBUsesPrefabGatePathWithoutRuntimeMacroPlacements() throws IOException {
+        assertPrefabModeHasNoRuntimePlacements(counterNetlist());
+        assertPrefabModeHasNoRuntimePlacements(seqLockNetlist());
+        assertPrefabModeHasNoRuntimePlacements(stationNetlist());
+    }
+
     private static void assertPrefabModeHasNoRuntimePlacements(String json) throws IOException {
         Circuit.TEST = true;
         try {
@@ -165,6 +172,137 @@ class SynthesisOptionsIntegrationTest {
                             "set_pulse":[4],
                             "clear_pulse":[5],
                             "q":[6]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                """;
+    }
+
+    private static String counterNetlist() {
+        return """
+                {
+                  "modules": {
+                    "top": {
+                      "attributes": {"top": "1"},
+                      "ports": {
+                        "clk": {"direction": "input", "bits": [2]},
+                        "rst": {"direction": "input", "bits": [3]},
+                        "inc": {"direction": "input", "bits": [4]},
+                        "clr": {"direction": "input", "bits": [5]},
+                        "c0": {"direction": "output", "bits": [6]},
+                        "c1": {"direction": "output", "bits": [7]}
+                      },
+                      "cells": {
+                        "u0": {
+                          "type": "mc_counter",
+                          "parameters": {"WIDTH": "00000000000000000000000000000010"},
+                          "port_directions": {
+                            "clk":"input","rst":"input","inc_pulse":"input","clear_pulse":"input","count":"output"
+                          },
+                          "connections": {
+                            "clk":[2],"rst":[3],"inc_pulse":[4],"clear_pulse":[5],"count":[6,7]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                """;
+    }
+
+    private static String seqLockNetlist() {
+        return """
+                {
+                  "modules": {
+                    "top": {
+                      "attributes": {"top": "1"},
+                      "ports": {
+                        "clk": {"direction": "input", "bits": [2]},
+                        "rst": {"direction": "input", "bits": [3]},
+                        "a": {"direction": "input", "bits": [4]},
+                        "b": {"direction": "input", "bits": [5]},
+                        "c": {"direction": "input", "bits": [6]},
+                        "unlocked": {"direction": "output", "bits": [7]},
+                        "correct": {"direction": "output", "bits": [8]},
+                        "wrong": {"direction": "output", "bits": [9]},
+                        "p0": {"direction": "output", "bits": [10]},
+                        "p1": {"direction": "output", "bits": [11]}
+                      },
+                      "cells": {
+                        "u0": {
+                          "type": "mc_seq_lock",
+                          "parameters": {
+                            "BTN_COUNT": "00000000000000000000000000000011",
+                            "SEQ_LEN": "00000000000000000000000000000011",
+                            "LATCH_SUCCESS": "00000000000000000000000000000001",
+                            "EXPECT_IDX": "00000000000000000000000000100100"
+                          },
+                          "port_directions": {
+                            "clk":"input",
+                            "rst":"input",
+                            "clear":"input",
+                            "btn_pulse":"input",
+                            "unlocked":"output",
+                            "correct_pulse":"output",
+                            "wrong_pulse":"output",
+                            "progress":"output"
+                          },
+                          "connections": {
+                            "clk":[2],
+                            "rst":[3],
+                            "clear":["0"],
+                            "btn_pulse":[4,5,6],
+                            "unlocked":[7],
+                            "correct_pulse":[8],
+                            "wrong_pulse":[9],
+                            "progress":[10,11]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                """;
+    }
+
+    private static String stationNetlist() {
+        return """
+                {
+                  "modules": {
+                    "top": {
+                      "attributes": {"top": "1"},
+                      "ports": {
+                        "clk": {"direction": "input", "bits": [2]},
+                        "rst": {"direction": "input", "bits": [3]},
+                        "arrive": {"direction": "input", "bits": [4]},
+                        "depart": {"direction": "input", "bits": [5]},
+                        "occupied": {"direction": "output", "bits": [6]},
+                        "depart_now": {"direction": "output", "bits": [7]}
+                      },
+                      "cells": {
+                        "u0": {
+                          "type": "mc_station_fsm",
+                          "parameters": {"DEPART_TICKS": "00000000000000000000000000000010"},
+                          "port_directions": {
+                            "clk":"input",
+                            "rst":"input",
+                            "clear":"input",
+                            "arrival_pulse":"input",
+                            "depart_pulse":"input",
+                            "occupied":"output",
+                            "depart_now":"output"
+                          },
+                          "connections": {
+                            "clk":[2],
+                            "rst":[3],
+                            "clear":["0"],
+                            "arrival_pulse":[4],
+                            "depart_pulse":[5],
+                            "occupied":[6],
+                            "depart_now":[7]
                           }
                         }
                       }
