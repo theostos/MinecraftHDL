@@ -5,10 +5,12 @@ import minecrafthdl.MHDLException;
 import minecrafthdl.Utils;
 import minecrafthdl.block.ModBlocks;
 import minecrafthdl.block.blocks.MacroRuntimeBlock;
+import minecrafthdl.synthesis.prefab.PrefabMacroGateFactory;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Blocks;
 
 import java.util.HashMap;
+import java.util.Map;
 
 public class LogicGates {
 
@@ -232,6 +234,10 @@ public class LogicGates {
         params.put("TICKS", (long) ticks);
         params.put("AUTO_CLK", 1L);
         params.put("AUTO_CLK_PERIOD_TICKS", (long) options.prefabAutoClockPeriodTicks());
+        Gate prefab = macroPrefabOrNull(instanceName, "mc_timer", 3, params, outputPort, outputBit, options);
+        if (prefab != null) {
+            return prefab;
+        }
         return macroModule(instanceName, "mc_timer", 3, params, outputPort, outputBit);
     }
 
@@ -248,6 +254,10 @@ public class LogicGates {
         params.put("PERIOD", (long) period);
         params.put("AUTO_CLK", 1L);
         params.put("AUTO_CLK_PERIOD_TICKS", (long) options.prefabAutoClockPeriodTicks());
+        Gate prefab = macroPrefabOrNull(instanceName, "mc_periodic", 3, params, outputPort, outputBit, options);
+        if (prefab != null) {
+            return prefab;
+        }
         return macroModule(instanceName, "mc_periodic", 3, params, outputPort, outputBit);
     }
 
@@ -263,6 +273,10 @@ public class LogicGates {
         HashMap<String, Long> params = new HashMap<String, Long>();
         params.put("AUTO_CLK", 1L);
         params.put("AUTO_CLK_PERIOD_TICKS", (long) options.prefabAutoClockPeriodTicks());
+        Gate prefab = macroPrefabOrNull(instanceName, "mc_latch", 4, params, outputPort, outputBit, options);
+        if (prefab != null) {
+            return prefab;
+        }
         return macroModule(instanceName, "mc_latch", 4, params, outputPort, outputBit);
     }
 
@@ -279,6 +293,10 @@ public class LogicGates {
         params.put("WIDTH", (long) width);
         params.put("AUTO_CLK", 1L);
         params.put("AUTO_CLK_PERIOD_TICKS", (long) options.prefabAutoClockPeriodTicks());
+        Gate prefab = macroPrefabOrNull(instanceName, "mc_counter", 4, params, outputPort, outputBit, options);
+        if (prefab != null) {
+            return prefab;
+        }
         return macroModule(instanceName, "mc_counter", 4, params, outputPort, outputBit);
     }
 
@@ -299,6 +317,10 @@ public class LogicGates {
         params.put("EXPECT_IDX", expectIdx);
         params.put("AUTO_CLK", 1L);
         params.put("AUTO_CLK_PERIOD_TICKS", (long) options.prefabAutoClockPeriodTicks());
+        Gate prefab = macroPrefabOrNull(instanceName, "mc_seq_lock", inputs, params, outputPort, outputBit, options);
+        if (prefab != null) {
+            return prefab;
+        }
         return macroModule(instanceName, "mc_seq_lock", inputs, params, outputPort, outputBit);
     }
 
@@ -315,7 +337,35 @@ public class LogicGates {
         params.put("DEPART_TICKS", (long) departTicks);
         params.put("AUTO_CLK", 1L);
         params.put("AUTO_CLK_PERIOD_TICKS", (long) options.prefabAutoClockPeriodTicks());
+        Gate prefab = macroPrefabOrNull(instanceName, "mc_station_fsm", 5, params, outputPort, outputBit, options);
+        if (prefab != null) {
+            return prefab;
+        }
         return macroModule(instanceName, "mc_station_fsm", 5, params, outputPort, outputBit);
+    }
+
+    private static Gate macroPrefabOrNull(
+            String instanceName,
+            String macroName,
+            int inputCount,
+            Map<String, Long> params,
+            String outputPort,
+            int outputBit,
+            SynthesisOptions options
+    ) {
+        if (options == null || !options.prefabMacrosEnabled()) {
+            return null;
+        }
+        return PrefabMacroGateFactory.tryBuild(
+                new PrefabMacroGateFactory.Request(
+                        instanceName,
+                        macroName,
+                        inputCount,
+                        params,
+                        outputPort,
+                        outputBit
+                )
+        );
     }
 
     private static Gate macroModule(String instanceName, String macroName, int inputs, HashMap<String, Long> params, String outputPort, int outputBit) {
