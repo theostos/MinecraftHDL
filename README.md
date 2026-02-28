@@ -99,6 +99,9 @@ Macro behavior contract is documented in:
 
 Cycle-accurate macro simulation (without launching Minecraft) is covered by tests in:
 - `src/test/java/minecrafthdl/simulation/prefab/`
+  - `PrefabMacroSpecVectorsTest`
+  - `PrefabMacroModelTest`
+  - `Example6AcceptanceTest`
 
 Prefab-macro options are available through Forge common config:
 - `prefabMacros.autoClockPeriodTicks` (default `2`)
