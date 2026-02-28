@@ -1,6 +1,7 @@
 package minecrafthdl;
 
 import minecrafthdl.block.ModBlocks;
+import minecrafthdl.block.entity.ModBlockEntities;
 import minecrafthdl.item.ModItems;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
@@ -16,6 +17,7 @@ public class MinecraftHDL {
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
         ModBlocks.BLOCKS.register(modEventBus);
+        ModBlockEntities.BLOCK_ENTITIES.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
 
         modEventBus.addListener(this::addCreative);
