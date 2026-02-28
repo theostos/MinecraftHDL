@@ -108,20 +108,15 @@ public class Router {
             }
         }
 
+        // Bottom vertices in this channel are sinks only.
+        // Any remaining free input pin indicates an unsupported dependency.
         for (Vertex v : bottom_vertices){
             GatePins gate = pin_map.get(v);
-
-            while (gate.hasNextPin()){
-                Pin next_pin = gate.getNextPin(v);
-                if (next_pin.empty() || next_pin.hasNet()) continue;
-
-                Net net = new Net();
-                nets.put(net.id, net);
-                net.addPin(next_pin, false);
-
-                for (Vertex next_vertex : v.getNext()){
-                    net.addPin(pin_map.get(next_vertex).getNextPin(v), false);
-                }
+            if (gate.hasNextPin()) {
+                throw new RuntimeException(
+                        "Unroutable channel dependency for vertex " + v.getID()
+                                + ": gate still has unassigned input pins after top-to-bottom net assignment."
+                );
             }
         }
 
