@@ -315,37 +315,49 @@ public class IntermediateCircuit {
         } else if (getFunctionType(v) == FunctionType.MC_TIMER) {
             if (!(v instanceof MacroVertex)) throw new MHDLException("MC_TIMER requires MacroVertex metadata");
             MacroVertex mv = (MacroVertex) v;
-            return Circuit.TEST ? TestLogicGates.MC_TIMER() : LogicGates.MC_TIMER(param(mv, "TICKS", 60), mv.getOutputBitIndex());
+            return Circuit.TEST ? TestLogicGates.MC_TIMER()
+                    : LogicGates.MC_TIMER(param(mv, "TICKS", 60), mv.getOutputPort(), mv.getOutputBitIndex());
         } else if (getFunctionType(v) == FunctionType.MC_PERIODIC) {
             if (!(v instanceof MacroVertex)) throw new MHDLException("MC_PERIODIC requires MacroVertex metadata");
             MacroVertex mv = (MacroVertex) v;
-            return Circuit.TEST ? TestLogicGates.MC_PERIODIC() : LogicGates.MC_PERIODIC(param(mv, "PERIOD", 20), mv.getOutputBitIndex());
+            return Circuit.TEST ? TestLogicGates.MC_PERIODIC()
+                    : LogicGates.MC_PERIODIC(param(mv, "PERIOD", 20), mv.getOutputPort(), mv.getOutputBitIndex());
         } else if (getFunctionType(v) == FunctionType.MC_LATCH) {
             if (!(v instanceof MacroVertex)) throw new MHDLException("MC_LATCH requires MacroVertex metadata");
             MacroVertex mv = (MacroVertex) v;
-            return Circuit.TEST ? TestLogicGates.MC_LATCH() : LogicGates.MC_LATCH(mv.getOutputBitIndex());
+            return Circuit.TEST ? TestLogicGates.MC_LATCH()
+                    : LogicGates.MC_LATCH(mv.getOutputPort(), mv.getOutputBitIndex());
         } else if (getFunctionType(v) == FunctionType.MC_COUNTER) {
             if (!(v instanceof MacroVertex)) throw new MHDLException("MC_COUNTER requires MacroVertex metadata");
             MacroVertex mv = (MacroVertex) v;
-            return Circuit.TEST ? TestLogicGates.MC_COUNTER() : LogicGates.MC_COUNTER(param(mv, "WIDTH", 8), mv.getOutputBitIndex());
+            return Circuit.TEST ? TestLogicGates.MC_COUNTER()
+                    : LogicGates.MC_COUNTER(param(mv, "WIDTH", 8), mv.getOutputPort(), mv.getOutputBitIndex());
         } else if (getFunctionType(v) == FunctionType.MC_SEQ_LOCK) {
             if (!(v instanceof MacroVertex)) throw new MHDLException("MC_SEQ_LOCK requires MacroVertex metadata");
             MacroVertex mv = (MacroVertex) v;
             int btnCount = param(mv, "BTN_COUNT", 3);
             int seqLen = param(mv, "SEQ_LEN", 3);
             int latchSuccess = param(mv, "LATCH_SUCCESS", 1);
-            return Circuit.TEST ? TestLogicGates.MC_SEQ_LOCK(btnCount) : LogicGates.MC_SEQ_LOCK(btnCount, seqLen, latchSuccess, mv.getOutputBitIndex());
+            long expectIdx = longParam(mv, "EXPECT_IDX", 0L);
+            return Circuit.TEST ? TestLogicGates.MC_SEQ_LOCK(btnCount)
+                    : LogicGates.MC_SEQ_LOCK(btnCount, seqLen, latchSuccess, expectIdx, mv.getOutputPort(), mv.getOutputBitIndex());
         } else if (getFunctionType(v) == FunctionType.MC_STATION_FSM) {
             if (!(v instanceof MacroVertex)) throw new MHDLException("MC_STATION_FSM requires MacroVertex metadata");
             MacroVertex mv = (MacroVertex) v;
-            return Circuit.TEST ? TestLogicGates.MC_STATION_FSM() : LogicGates.MC_STATION_FSM(param(mv, "DEPART_TICKS", 20), mv.getOutputBitIndex());
+            return Circuit.TEST ? TestLogicGates.MC_STATION_FSM()
+                    : LogicGates.MC_STATION_FSM(param(mv, "DEPART_TICKS", 20), mv.getOutputPort(), mv.getOutputBitIndex());
         }
 
         throw new MHDLException("NO SUCH GATE AVAILABLE");
     }
 
     private static int param(MacroVertex vertex, String key, int defaultValue) {
-        Integer value = vertex.getParams().get(key);
+        Long value = vertex.getParams().get(key);
+        return value == null ? defaultValue : value.intValue();
+    }
+
+    private static long longParam(MacroVertex vertex, String key, long defaultValue) {
+        Long value = vertex.getParams().get(key);
         return value == null ? defaultValue : value;
     }
 

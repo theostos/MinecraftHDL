@@ -294,8 +294,8 @@ public class GraphBuilder {
     private static void addMcTimerCell(Graph graph, JCell cell) {
         int ticks = parseParameter(cell, "TICKS", 60, 1, MAX_TIMER_TICKS);
 
-        HashMap<String, Integer> params = new HashMap<String, Integer>();
-        params.put("TICKS", ticks);
+        HashMap<String, Long> params = new HashMap<String, Long>();
+        params.put("TICKS", (long) ticks);
 
         ArrayList<Integer> inputNets = orderedSingleBitInputs(cell, "clk", "rst", "trigger_pulse");
         ArrayList<MacroOutput> outputs = singleBitOutputs(cell, "active");
@@ -306,8 +306,8 @@ public class GraphBuilder {
     private static void addMcPeriodicCell(Graph graph, JCell cell) {
         int period = parseParameter(cell, "PERIOD", 20, 1, MAX_PERIOD_TICKS);
 
-        HashMap<String, Integer> params = new HashMap<String, Integer>();
-        params.put("PERIOD", period);
+        HashMap<String, Long> params = new HashMap<String, Long>();
+        params.put("PERIOD", (long) period);
 
         ArrayList<Integer> inputNets = orderedSingleBitInputs(cell, "clk", "rst", "enable");
         ArrayList<MacroOutput> outputs = singleBitOutputs(cell, "pulse");
@@ -316,7 +316,7 @@ public class GraphBuilder {
     }
 
     private static void addMcLatchCell(Graph graph, JCell cell) {
-        HashMap<String, Integer> params = new HashMap<String, Integer>();
+        HashMap<String, Long> params = new HashMap<String, Long>();
 
         ArrayList<Integer> inputNets = orderedSingleBitInputs(cell, "clk", "rst", "set_pulse", "clear_pulse");
         ArrayList<MacroOutput> outputs = singleBitOutputs(cell, "q");
@@ -327,8 +327,8 @@ public class GraphBuilder {
     private static void addMcCounterCell(Graph graph, JCell cell) {
         int width = parseParameter(cell, "WIDTH", 8, 1, MAX_COUNTER_WIDTH);
 
-        HashMap<String, Integer> params = new HashMap<String, Integer>();
-        params.put("WIDTH", width);
+        HashMap<String, Long> params = new HashMap<String, Long>();
+        params.put("WIDTH", (long) width);
 
         ArrayList<Integer> inputNets = orderedSingleBitInputs(cell, "clk", "rst", "inc_pulse", "clear_pulse");
         ArrayList<MacroOutput> outputs = vectorOutputs(cell, "count", width);
@@ -340,11 +340,15 @@ public class GraphBuilder {
         int btnCount = parseParameter(cell, "BTN_COUNT", 3, 1, MAX_BTN_COUNT);
         int seqLen = parseParameter(cell, "SEQ_LEN", 3, 1, MAX_SEQ_LEN);
         int latchSuccess = parseParameter(cell, "LATCH_SUCCESS", 1, 0, 1);
+        int expectBits = ceilLog2(btnCount) * seqLen;
+        long maxExpectIdx = expectBits >= 63 ? Long.MAX_VALUE : ((1L << expectBits) - 1L);
+        long expectIdx = parseParameterLong(cell, "EXPECT_IDX", 0L, 0L, maxExpectIdx);
 
-        HashMap<String, Integer> params = new HashMap<String, Integer>();
-        params.put("BTN_COUNT", btnCount);
-        params.put("SEQ_LEN", seqLen);
-        params.put("LATCH_SUCCESS", latchSuccess);
+        HashMap<String, Long> params = new HashMap<String, Long>();
+        params.put("BTN_COUNT", (long) btnCount);
+        params.put("SEQ_LEN", (long) seqLen);
+        params.put("LATCH_SUCCESS", (long) latchSuccess);
+        params.put("EXPECT_IDX", expectIdx);
 
         ArrayList<Integer> inputNets = orderedSingleBitInputs(cell, "clk", "rst", "clear");
         inputNets.addAll(vectorInput(cell, "btn_pulse", btnCount));
@@ -363,8 +367,8 @@ public class GraphBuilder {
     private static void addMcStationFsmCell(Graph graph, JCell cell) {
         int departTicks = parseParameter(cell, "DEPART_TICKS", 20, 1, MAX_DEPART_TICKS);
 
-        HashMap<String, Integer> params = new HashMap<String, Integer>();
-        params.put("DEPART_TICKS", departTicks);
+        HashMap<String, Long> params = new HashMap<String, Long>();
+        params.put("DEPART_TICKS", (long) departTicks);
 
         ArrayList<Integer> inputNets = orderedSingleBitInputs(cell, "clk", "rst", "clear", "arrival_pulse", "depart_pulse");
 
@@ -375,7 +379,7 @@ public class GraphBuilder {
         addMacroVertices(graph, FunctionType.MC_STATION_FSM, "mc_station_fsm", params, inputNets, outputs);
     }
 
-    private static void addMacroVertices(Graph graph, FunctionType type, String macroName, Map<String, Integer> params, ArrayList<Integer> inputNets, ArrayList<MacroOutput> outputs) {
+    private static void addMacroVertices(Graph graph, FunctionType type, String macroName, Map<String, Long> params, ArrayList<Integer> inputNets, ArrayList<MacroOutput> outputs) {
         if (outputs.isEmpty()) {
             throw new MHDLException("Macro " + macroName + " has no outputs");
         }
@@ -445,13 +449,33 @@ public class GraphBuilder {
     }
 
     private static int parseParameter(JCell cell, String key, int defaultValue, int minInclusive, int maxInclusive) {
-        int value = defaultValue;
+        long value = defaultValue;
 
         if (cell.parameters != null && cell.parameters.containsKey(key)) {
             value = parseBinaryLiteral(cell.parameters.get(key));
         }
 
-        Integer fromType = parseParameterFromType(cell.type, key);
+        Long fromType = parseParameterFromType(cell.type, key);
+        if (fromType != null) {
+            value = fromType;
+        }
+
+        if (value < minInclusive || value > maxInclusive) {
+            throw new MHDLException("Macro parameter " + key + " out of bounds: " + value
+                    + " (allowed " + minInclusive + ".." + maxInclusive + ")");
+        }
+
+        return (int) value;
+    }
+
+    private static long parseParameterLong(JCell cell, String key, long defaultValue, long minInclusive, long maxInclusive) {
+        long value = defaultValue;
+
+        if (cell.parameters != null && cell.parameters.containsKey(key)) {
+            value = parseBinaryLiteral(cell.parameters.get(key));
+        }
+
+        Long fromType = parseParameterFromType(cell.type, key);
         if (fromType != null) {
             value = fromType;
         }
@@ -464,7 +488,7 @@ public class GraphBuilder {
         return value;
     }
 
-    private static Integer parseParameterFromType(String cellType, String key) {
+    private static Long parseParameterFromType(String cellType, String key) {
         String type = normalize(cellType);
         String token = normalize(key) + "=S";
 
@@ -494,7 +518,7 @@ public class GraphBuilder {
         return parseBinaryLiteral(type.substring(quote + 1, end));
     }
 
-    private static int parseBinaryLiteral(String literal) {
+    private static long parseBinaryLiteral(String literal) {
         if (literal == null) {
             throw new MHDLException("Null parameter literal");
         }
@@ -508,7 +532,11 @@ public class GraphBuilder {
             throw new MHDLException("Invalid parameter literal: " + literal);
         }
 
-        int value = 0;
+        if (bits.length() > 63) {
+            throw new MHDLException("Parameter literal too wide for runtime support: " + literal);
+        }
+
+        long value = 0L;
         for (int i = 0; i < bits.length(); i++) {
             char c = bits.charAt(i);
             value <<= 1;
