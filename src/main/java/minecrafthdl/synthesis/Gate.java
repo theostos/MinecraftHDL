@@ -1,17 +1,11 @@
 package minecrafthdl.synthesis;
 
-import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.math.Vec3d;
-
-import java.util.HashMap;
-
-/**
- * Created by Francis O'Brien - 3/3/2017 - 9:47 AM
- */
-
 public class Gate extends Circuit {
 
-    public int num_inputs, num_outputs, input_spacing, output_spacing = 0;
+    public int num_inputs;
+    public int num_outputs;
+    public int input_spacing;
+    public int output_spacing;
     public int[] output_lines;
 
     public String[] id_txt;

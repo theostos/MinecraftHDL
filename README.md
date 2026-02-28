@@ -7,6 +7,38 @@
 # Minecraft HDL 
  
 Minecraft HDL is a digital synthesis flow for minecraft redstone circuits. It is an attempt to use industry standard design tools and methods to generate digital circuits with redstone. 
+
+## Forge 1.20.1 Port (Linux)
+
+This repository is now ported to Forge `1.20.1` with a modern Gradle setup.
+
+### Run the mod client
+
+```bash
+./gradlew runClient
+```
+
+Notes:
+- Java 17 is the target runtime for Minecraft 1.20.1.
+- If Java 17 is not installed locally, Gradle can download a matching toolchain automatically.
+
+### Synthesize Verilog on Linux
+
+Install `yosys`, then run:
+
+```bash
+cd verilog/linux
+./synth.sh /absolute/path/to/your_design.v
+```
+
+This generates `your_design.v.json` in `verilog/linux/`.
+
+### Use in-game
+
+1. Start the Forge 1.20.1 client via `runClient`.
+2. Place the Synthesizer block (Redstone creative tab).
+3. Copy your JSON netlist into `run/verilog_designs/`.
+4. Right-click the Synthesizer block, pick a file in the UI, then power the block with redstone to generate the circuit.
  
 ### Example: 
  
@@ -39,6 +71,7 @@ With the 6 inputs on the right and the single output on the left
 # Quick Links 
 - [Screenshots & Sample Circuits](markdown/SAMPLES.md) 
 - [Getting Started - Installing and Using MinecraftHDL](markdown/GETTING_STARTED.md) 
+- [Getting Started - Forge 1.20.1 Linux](markdown/GETTING_STARTED_1.20.1.md)
 - [Background Theory - Digital Design & Verilog](markdown/BACKGROUND.md)
 - [How MinecraftHDL Works - Read Our Paper](markdown/minecrafthdl-digital-synthesis.pdf)
 - [Developper Info - If you want to fork or contribute](markdown/DEV_SETUP.md)

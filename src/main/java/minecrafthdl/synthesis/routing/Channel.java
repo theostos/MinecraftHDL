@@ -6,63 +6,66 @@ import minecrafthdl.synthesis.routing.pins.Pin;
 import minecrafthdl.synthesis.routing.pins.PinPair;
 import minecrafthdl.synthesis.routing.pins.PinsArray;
 import minecrafthdl.synthesis.routing.vcg.VerticalConstraintGraph;
-import net.minecraft.init.Blocks;
-import net.minecraft.util.EnumFacing;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.Blocks;
 
 import java.util.ArrayList;
 
-/**
- * Created by Francis O'Brien - 3/3/2017 - 8:37 AM
- */
-
 public class Channel {
     public PinsArray pinsArray;
-    public ArrayList<ArrayList<Net>> tracks = new ArrayList<ArrayList<Net>>();
+    public ArrayList<ArrayList<Net>> tracks = new ArrayList<>();
 
-    public void findAvailableTrack(Net net, VerticalConstraintGraph vcg){
-        if (net == null){
+    public void findAvailableTrack(Net net, VerticalConstraintGraph vcg) {
+        if (net == null) {
             return;
         }
+
         int highest_track = 0;
         try {
-            for (int vc_id : vcg.getEdgeIDList(net.id)){
-                for (ArrayList<Net> track : this.tracks){
-                    for (Net n : track){
-                        if (n.id == vc_id && n.track >= highest_track) highest_track = n.track + 1;
+            for (int vc_id : vcg.getEdgeIDList(net.id)) {
+                for (ArrayList<Net> track : this.tracks) {
+                    for (Net n : track) {
+                        if (n.id == vc_id && n.track >= highest_track) {
+                            highest_track = n.track + 1;
+                        }
                     }
                 }
             }
-
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        for(int i = highest_track; i < this.tracks.size(); i++){
+        for (int i = highest_track; i < this.tracks.size(); i++) {
             boolean hasConflict = false;
-            for (Net n : this.tracks.get(i)){
+            for (Net n : this.tracks.get(i)) {
                 hasConflict = n.hasHorizontalConflict(net);
-                if (hasConflict) break;
+                if (hasConflict) {
+                    break;
+                }
             }
-            if (!hasConflict){
+            if (!hasConflict) {
                 this.tracks.get(i).add(net);
                 net.setTrack(i);
                 return;
             }
         }
-        ArrayList<Net> new_track = new ArrayList<Net>();
+
+        ArrayList<Net> new_track = new ArrayList<>();
         new_track.add(net);
         this.tracks.add(new_track);
         net.setTrack(this.tracks.size() - 1);
     }
 
-    public Circuit genChannelCircuit(){
+    public Circuit genChannelCircuit() {
         int length = 2 + (3 * this.tracks.size());
         int height = 3;
         int width = 0;
 
-        for (ArrayList<Net> track : this.tracks){
-            for (Net n : track){
-                if (n.x_max > width) width = n.x_max;
+        for (ArrayList<Net> track : this.tracks) {
+            for (Net n : track) {
+                if (n.x_max > width) {
+                    width = n.x_max;
+                }
             }
         }
 
@@ -70,22 +73,24 @@ public class Channel {
 
         Circuit circuit = new Circuit(width, height, length);
 
-        ArrayList<Net> nets_done = new ArrayList<Net>();
+        ArrayList<Net> nets_done = new ArrayList<>();
 
-        for(ArrayList<Net> track : this.tracks){
-            for (Net n : track){
-                if (nets_done.contains(n)) continue;
+        for (ArrayList<Net> track : this.tracks) {
+            for (Net n : track) {
+                if (nets_done.contains(n)) {
+                    continue;
+                }
                 this.placeTrack(circuit, n.track, n.x_min, n.x_max, n.getpins());
                 nets_done.add(n);
 
-                if (n.isOutpath()){
-                    circuit.setBlock(n.x_max, 0, n.trackZ() + 1, Blocks.WOOL.getDefaultState());
-                    circuit.setBlock(n.x_max, 1, n.trackZ() + 1, Blocks.REDSTONE_WIRE.getDefaultState());
+                if (n.isOutpath()) {
+                    circuit.setBlock(n.x_max, 0, n.trackZ() + 1, Blocks.WHITE_WOOL.defaultBlockState());
+                    circuit.setBlock(n.x_max, 1, n.trackZ() + 1, Blocks.REDSTONE_WIRE.defaultBlockState());
                 }
 
-                if (n.out_partner != null && !n.isOutpath()){
-                    circuit.setBlock(n.x_max, 0, n.trackZ() - 1, Blocks.WOOL.getDefaultState());
-                    circuit.setBlock(n.x_max, 1, n.trackZ() - 1, Blocks.REDSTONE_WIRE.getDefaultState());
+                if (n.out_partner != null && !n.isOutpath()) {
+                    circuit.setBlock(n.x_max, 0, n.trackZ() - 1, Blocks.WHITE_WOOL.defaultBlockState());
+                    circuit.setBlock(n.x_max, 1, n.trackZ() - 1, Blocks.REDSTONE_WIRE.defaultBlockState());
                 }
 
                 this.wireColumns(circuit, n);
@@ -93,43 +98,44 @@ public class Channel {
             }
         }
 
-
-
         return circuit;
     }
 
-    public void printChannel(){
+    public void printChannel() {
         int width = pinsArray.getPairs().size();
         int height = tracks.size() + 2;
 
         String[][] chars = new String[width][height];
 
-        for (int x = 0; x < width; x++){
-            for (int y = 0; y < height; y++){
+        for (int x = 0; x < width; x++) {
+            for (int y = 0; y < height; y++) {
                 chars[x][y] = ".";
             }
         }
 
-        for (int x = 0; x < width; x++){
+        for (int x = 0; x < width; x++) {
             PinPair pair = pinsArray.getPair(x);
 
             chars[x][0] = Integer.toString(pair.top.netID()).charAt(0) + "";
             chars[x][height - 1] = Integer.toString(pair.bot.netID()).charAt(0) + "";
-            if (pair.top.empty()) chars[x][0] = " ";
-            if (pair.bot.empty()) chars[x][height - 1] = " ";
+            if (pair.top.empty()) {
+                chars[x][0] = " ";
+            }
+            if (pair.bot.empty()) {
+                chars[x][height - 1] = " ";
+            }
         }
 
-
-        for (ArrayList<Net> t : tracks){
-            for (Net n: t){
-                for (Pin p : n.getpins()){
+        for (ArrayList<Net> t : tracks) {
+            for (Net n : t) {
+                for (Pin p : n.getpins()) {
                     if (p.top) {
-                        for(int i = 1; i <= n.track + 1; i++){
-                            chars[p.xPos()/2][i] = "│";
+                        for (int i = 1; i <= n.track + 1; i++) {
+                            chars[p.xPos() / 2][i] = "│";
                         }
                     } else {
-                        for(int i = n.track + 1; i < height - 1; i++){
-                            chars[p.xPos()/2][i] = "│";
+                        for (int i = n.track + 1; i < height - 1; i++) {
+                            chars[p.xPos() / 2][i] = "│";
                         }
                     }
                 }
@@ -138,33 +144,34 @@ public class Channel {
 
         for (ArrayList<Net> t : tracks) {
             for (Net n : t) {
-                if (n.isOutpath()){
-                    for (int y = n.track; y <= n.out_partner.track; y++){
+                if (n.isOutpath()) {
+                    for (int y = n.track; y <= n.out_partner.track; y++) {
                         chars[n.x_max / 2][y + 1] = "|";
                     }
                 }
             }
         }
 
-        for (ArrayList<Net> t : tracks){
-            for (Net n: t){
-                for (int i = n.x_min/2; i <= n.x_max/2; i++){
-                    if(n.x_max == n.x_min) continue;
+        for (ArrayList<Net> t : tracks) {
+            for (Net n : t) {
+                for (int i = n.x_min / 2; i <= n.x_max / 2; i++) {
+                    if (n.x_max == n.x_min) {
+                        continue;
+                    }
                     chars[i][n.track + 1] = "─";
                 }
             }
         }
 
+        for (ArrayList<Net> t : tracks) {
+            for (Net n : t) {
 
-        for (ArrayList<Net> t : tracks){
-            for (Net n: t){
-
-                if(n.isOutpath()){
-                    chars[n.x_max / 2][n.track+1] = "┐";
-                    chars[n.x_max / 2][n.out_partner.track+1] = "┘";
+                if (n.isOutpath()) {
+                    chars[n.x_max / 2][n.track + 1] = "┐";
+                    chars[n.x_max / 2][n.out_partner.track + 1] = "┘";
                 }
 
-                for (Pin p : n.getpins()){
+                for (Pin p : n.getpins()) {
                     int x = p.xPos() / 2;
 
                     boolean up = false;
@@ -172,52 +179,70 @@ public class Channel {
                     boolean left = n.x_min / 2 < x;
                     boolean right = n.x_max / 2 > x;
 
-                    if (p.top){
+                    if (p.top) {
                         up = true;
-                        for (Pin p2 : n.getpins()){
-                            if (p2 != p && p.xPos() == p2.xPos()) down = true;
+                        for (Pin p2 : n.getpins()) {
+                            if (p2 != p && p.xPos() == p2.xPos()) {
+                                down = true;
+                            }
                         }
                     } else {
                         down = true;
-                        for (Pin p2 : n.getpins()){
-                            if (p2 != p && p.xPos() == p2.xPos()) up = true;
+                        for (Pin p2 : n.getpins()) {
+                            if (p2 != p && p.xPos() == p2.xPos()) {
+                                up = true;
+                            }
                         }
                     }
 
-                    if (up){
-                        if (down){
-                            if (left){
-                                if (right) chars[x][n.track + 1] = "┼";
-                                else chars[x][n.track + 1] = "┤";
+                    if (up) {
+                        if (down) {
+                            if (left) {
+                                if (right) {
+                                    chars[x][n.track + 1] = "┼";
+                                } else {
+                                    chars[x][n.track + 1] = "┤";
+                                }
                             } else {
-                                if (right) chars[x][n.track + 1] = "├";
-                                //else chars[x][n.track + 1] = "│";
+                                if (right) {
+                                    chars[x][n.track + 1] = "├";
+                                }
                             }
                         } else {
-                            if (left){
-                                if (right) chars[x][n.track + 1] = "┴";
-                                else chars[x][n.track + 1] = "┘";
+                            if (left) {
+                                if (right) {
+                                    chars[x][n.track + 1] = "┴";
+                                } else {
+                                    chars[x][n.track + 1] = "┘";
+                                }
                             } else {
-                                if (right) chars[x][n.track + 1] = "└";
-                                else chars[x][n.track + 1] = "?";
+                                if (right) {
+                                    chars[x][n.track + 1] = "└";
+                                } else {
+                                    chars[x][n.track + 1] = "?";
+                                }
                             }
                         }
                     } else {
-                        if (down){
-                            if (left){
-                                if (right) chars[x][n.track + 1] = "┬";
-                                else chars[x][n.track + 1] = "┐";
+                        if (down) {
+                            if (left) {
+                                if (right) {
+                                    chars[x][n.track + 1] = "┬";
+                                } else {
+                                    chars[x][n.track + 1] = "┐";
+                                }
                             } else {
-                                if (right) chars[x][n.track + 1] = "┌";
-                                else chars[x][n.track + 1] = "?";
+                                if (right) {
+                                    chars[x][n.track + 1] = "┌";
+                                } else {
+                                    chars[x][n.track + 1] = "?";
+                                }
                             }
                         } else {
-                            if (left){
-                                //if (right) chars[x][n.track + 1] = "─";
-                                //else chars[x][n.track + 1] = "?";
+                            if (left) {
+                                // noop
                             } else {
-                                if (right) chars[x][n.track + 1] = "?";
-                                else chars[x][n.track + 1] = "?";
+                                chars[x][n.track + 1] = "?";
                             }
                         }
                     }
@@ -225,53 +250,51 @@ public class Channel {
             }
         }
 
-        for (int y = 0; y < height; y++){
+        for (int y = 0; y < height; y++) {
             String row = "";
-            for (int x = 0; x < width; x++){
+            for (int x = 0; x < width; x++) {
                 row += chars[x][y];
-                //row += " ";
             }
             System.out.println(row);
         }
-
     }
 
-    public void placeTrack(Circuit channel, int track_number, int xmin, int xmax, ArrayList<Pin> pins){
+    public void placeTrack(Circuit channel, int track_number, int xmin, int xmax, ArrayList<Pin> pins) {
         int z_min = 1 + (3 * track_number);
         int z_track = z_min + 1;
 
-        for (int x = xmin; x <= xmax; x++){
-            channel.setBlock(x, 1, z_track, Blocks.WOOL.getDefaultState());
-            channel.setBlock(x, 2, z_track, Blocks.REDSTONE_WIRE.getDefaultState());
+        for (int x = xmin; x <= xmax; x++) {
+            channel.setBlock(x, 1, z_track, Blocks.WHITE_WOOL.defaultBlockState());
+            channel.setBlock(x, 2, z_track, Blocks.REDSTONE_WIRE.defaultBlockState());
         }
 
-        for (Pin p : pins){
+        for (Pin p : pins) {
             if (p.top) {
-                channel.setBlock(p.xPos(), 0, z_min, Blocks.WOOL.getDefaultState());
-                channel.setBlock(p.xPos(), 1, z_min, Blocks.REDSTONE_WIRE.getDefaultState());
+                channel.setBlock(p.xPos(), 0, z_min, Blocks.WHITE_WOOL.defaultBlockState());
+                channel.setBlock(p.xPos(), 1, z_min, Blocks.REDSTONE_WIRE.defaultBlockState());
             } else {
-                channel.setBlock(p.xPos(), 0, z_track + 1, Blocks.WOOL.getDefaultState());
-                channel.setBlock(p.xPos(), 1, z_track + 1, Blocks.REDSTONE_WIRE.getDefaultState());
+                channel.setBlock(p.xPos(), 0, z_track + 1, Blocks.WHITE_WOOL.defaultBlockState());
+                channel.setBlock(p.xPos(), 1, z_track + 1, Blocks.REDSTONE_WIRE.defaultBlockState());
             }
         }
     }
 
     public void wireColumns(Circuit channel, Net n) {
-        for (Pin p : n.getpins()){
+        for (Pin p : n.getpins()) {
             if (p.top) {
-                for (int z = 0; z < n.trackZ() - 1; z++){
-                    channel.setBlock(p.xPos(), 0, z, Blocks.REDSTONE_WIRE.getDefaultState());
+                for (int z = 0; z < n.trackZ() - 1; z++) {
+                    channel.setBlock(p.xPos(), 0, z, Blocks.REDSTONE_WIRE.defaultBlockState());
                 }
             } else {
-                for (int z = n.trackZ() + 2; z < this.sizeZ(); z++){
-                    channel.setBlock(p.xPos(), 0, z, Blocks.REDSTONE_WIRE.getDefaultState());
+                for (int z = n.trackZ() + 2; z < this.sizeZ(); z++) {
+                    channel.setBlock(p.xPos(), 0, z, Blocks.REDSTONE_WIRE.defaultBlockState());
                 }
             }
         }
 
-        if (n.isOutpath()){
-            for (int z = n.trackZ() + 2; z < n.out_partner.trackZ() - 1; z++){
-                channel.setBlock(n.x_max, 0, z, Blocks.REDSTONE_WIRE.getDefaultState());
+        if (n.isOutpath()) {
+            for (int z = n.trackZ() + 2; z < n.out_partner.trackZ() - 1; z++) {
+                channel.setBlock(n.x_max, 0, z, Blocks.REDSTONE_WIRE.defaultBlockState());
             }
         }
     }
@@ -281,86 +304,92 @@ public class Channel {
         for (Pin p : n.getpins()) {
             if (p.top) {
                 if (n.trackZ() > 10) {
-                    for (int z = n.trackZ() - 10; z > -1; z -= 10){
-                        channel.setBlock(p.xPos(), 0, z, Blocks.UNPOWERED_REPEATER.getDefaultState().withProperty(Utils.getPropertyByName(Blocks.UNPOWERED_REPEATER, "facing"), EnumFacing.NORTH));
+                    for (int z = n.trackZ() - 10; z > -1; z -= 10) {
+                        channel.setBlock(p.xPos(), 0, z, Utils.repeater(Direction.NORTH));
                     }
                 }
 
                 if (p.xPos() > n.x_min) {
-                    channel.setBlock(p.xPos() - 1, 2, n.trackZ(), Blocks.UNPOWERED_REPEATER.getDefaultState().withProperty(Utils.getPropertyByName(Blocks.UNPOWERED_REPEATER, "facing"), EnumFacing.EAST));
+                    channel.setBlock(p.xPos() - 1, 2, n.trackZ(), Utils.repeater(Direction.EAST));
                 }
 
                 if (p.xPos() < n.x_max) {
-                    channel.setBlock(p.xPos() + 1, 2, n.trackZ(), Blocks.UNPOWERED_REPEATER.getDefaultState().withProperty(Utils.getPropertyByName(Blocks.UNPOWERED_REPEATER, "facing"), EnumFacing.WEST));
+                    channel.setBlock(p.xPos() + 1, 2, n.trackZ(), Utils.repeater(Direction.WEST));
                 }
             } else {
                 if (channel.getSizeZ() - n.trackZ() > 10) {
-                    for (int z = n.trackZ() + 3; z < channel.getSizeZ(); z += 10){
-                        channel.setBlock(p.xPos(), 0, z, Blocks.UNPOWERED_REPEATER.getDefaultState().withProperty(Utils.getPropertyByName(Blocks.UNPOWERED_REPEATER, "facing"), EnumFacing.NORTH));
+                    for (int z = n.trackZ() + 3; z < channel.getSizeZ(); z += 10) {
+                        channel.setBlock(p.xPos(), 0, z, Utils.repeater(Direction.NORTH));
                     }
                 }
                 if (!(!n.outpath && n.out_partner != null)) {
                     if (p.xPos() > n.x_min) {
-                        if (p.xPos() > n.top_pin.xPos())
-                            channel.setBlock(p.xPos() - 1, 2, n.trackZ(), Blocks.UNPOWERED_REPEATER.getDefaultState().withProperty(Utils.getPropertyByName(Blocks.UNPOWERED_REPEATER, "facing"), EnumFacing.WEST));
+                        if (p.xPos() > n.top_pin.xPos()) {
+                            channel.setBlock(p.xPos() - 1, 2, n.trackZ(), Utils.repeater(Direction.WEST));
+                        }
                     }
 
                     if (p.xPos() < n.x_max) {
-                        if (p.xPos() < n.top_pin.xPos())
-                            channel.setBlock(p.xPos() + 1, 2, n.trackZ(), Blocks.UNPOWERED_REPEATER.getDefaultState().withProperty(Utils.getPropertyByName(Blocks.UNPOWERED_REPEATER, "facing"), EnumFacing.EAST));
+                        if (p.xPos() < n.top_pin.xPos()) {
+                            channel.setBlock(p.xPos() + 1, 2, n.trackZ(), Utils.repeater(Direction.EAST));
+                        }
                     }
                 } else {
-                    channel.setBlock(p.xPos() + 1, 2, n.trackZ(), Blocks.UNPOWERED_REPEATER.getDefaultState().withProperty(Utils.getPropertyByName(Blocks.UNPOWERED_REPEATER, "facing"), EnumFacing.EAST));
+                    channel.setBlock(p.xPos() + 1, 2, n.trackZ(), Utils.repeater(Direction.EAST));
                 }
             }
         }
 
         if (n.x_max - n.x_min > 19) {
             for (int x = n.x_min + 2; x < n.x_max - 2; x += 14) {
-                for (Pin p : n.getpins()){
-                    if (x == p.xPos()) x-= 1;
+                for (Pin p : n.getpins()) {
+                    if (x == p.xPos()) {
+                        x -= 1;
+                    }
                 }
 
                 if (!(!n.outpath && n.out_partner != null)) {
-                    if (x < n.top_pin.xPos())
-                        channel.setBlock(x, 2, n.trackZ(), Blocks.UNPOWERED_REPEATER.getDefaultState().withProperty(Utils.getPropertyByName(Blocks.UNPOWERED_REPEATER, "facing"), EnumFacing.EAST));
-                    if (x > n.top_pin.xPos())
-                        channel.setBlock(x, 2, n.trackZ(), Blocks.UNPOWERED_REPEATER.getDefaultState().withProperty(Utils.getPropertyByName(Blocks.UNPOWERED_REPEATER, "facing"), EnumFacing.WEST));
+                    if (x < n.top_pin.xPos()) {
+                        channel.setBlock(x, 2, n.trackZ(), Utils.repeater(Direction.EAST));
+                    }
+                    if (x > n.top_pin.xPos()) {
+                        channel.setBlock(x, 2, n.trackZ(), Utils.repeater(Direction.WEST));
+                    }
                 } else {
-                    channel.setBlock(x, 2, n.trackZ(), Blocks.UNPOWERED_REPEATER.getDefaultState().withProperty(Utils.getPropertyByName(Blocks.UNPOWERED_REPEATER, "facing"), EnumFacing.EAST));
+                    channel.setBlock(x, 2, n.trackZ(), Utils.repeater(Direction.EAST));
                 }
             }
         }
 
-        if (n.isOutpath()){
+        if (n.isOutpath()) {
             if (n.out_partner.trackZ() - n.trackZ() > 14) {
-                for (int z = n.trackZ() + 3; z < n.out_partner.trackZ() - 2; z += 13){
-                    channel.setBlock(n.x_max, 0, z, Blocks.UNPOWERED_REPEATER.getDefaultState().withProperty(Utils.getPropertyByName(Blocks.UNPOWERED_REPEATER, "facing"), EnumFacing.NORTH));
+                for (int z = n.trackZ() + 3; z < n.out_partner.trackZ() - 2; z += 13) {
+                    channel.setBlock(n.x_max, 0, z, Utils.repeater(Direction.NORTH));
                 }
             }
 
-            channel.setBlock(n.x_max - 1, 2, n.trackZ(), Blocks.UNPOWERED_REPEATER.getDefaultState().withProperty(Utils.getPropertyByName(Blocks.UNPOWERED_REPEATER, "facing"), EnumFacing.WEST));
+            channel.setBlock(n.x_max - 1, 2, n.trackZ(), Utils.repeater(Direction.WEST));
         }
 
-        if (!n.isOutpath() && n.out_partner != null){
-            channel.setBlock(n.x_max - 1, 2, n.trackZ(), Blocks.UNPOWERED_REPEATER.getDefaultState().withProperty(Utils.getPropertyByName(Blocks.UNPOWERED_REPEATER, "facing"), EnumFacing.EAST));
-
+        if (!n.isOutpath() && n.out_partner != null) {
+            channel.setBlock(n.x_max - 1, 2, n.trackZ(), Utils.repeater(Direction.EAST));
         }
     }
 
-    public int sizeX(){
+    public int sizeX() {
         int x_max = 0;
 
-        for (ArrayList<Net> t : this.tracks){
-            for (Net n : t){
-                if (n.x_max > x_max) x_max = n.x_max;
+        for (ArrayList<Net> t : this.tracks) {
+            for (Net n : t) {
+                if (n.x_max > x_max) {
+                    x_max = n.x_max;
+                }
             }
         }
         return x_max;
     }
 
-    public int sizeZ(){
+    public int sizeZ() {
         return 2 + (this.tracks.size() * 3);
     }
-
 }

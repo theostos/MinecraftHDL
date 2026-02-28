@@ -1,52 +1,29 @@
 package minecrafthdl;
 
-import net.minecraft.init.Blocks;
-import net.minecraft.init.Items;
-import net.minecraft.item.ItemStack;
-import net.minecraftforge.common.MinecraftForge;
+import minecrafthdl.block.ModBlocks;
+import minecrafthdl.item.ModItems;
+import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
+import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.Mod.EventHandler;
-import net.minecraftforge.fml.common.SidedProxy;
-import net.minecraftforge.fml.common.event.FMLInitializationEvent;
-import net.minecraftforge.fml.common.event.FMLPostInitializationEvent;
-import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
-import net.minecraftforge.fml.common.registry.GameRegistry;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 
-@Mod(modid = MinecraftHDL.MODID, name = MinecraftHDL.MODNAME, version = MinecraftHDL.VERSION)
-public class MinecraftHDL
-{
+@Mod(MinecraftHDL.MODID)
+public class MinecraftHDL {
     public static final String MODID = "minecrafthdl";
-    public static final String MODNAME = "Minecraft HDL";
-    public static final String VERSION = "1.0";
 
-    @SidedProxy(clientSide="minecrafthdl.ClientProxy", serverSide="minecrafthdl.ServerProxy")
-    public static CommonProxy proxy;
+    public MinecraftHDL() {
+        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
-    @Mod.Instance
-    public static MinecraftHDL instance = new MinecraftHDL();
+        ModBlocks.BLOCKS.register(modEventBus);
+        ModItems.ITEMS.register(modEventBus);
 
-    @EventHandler
-    public void preInit(FMLPreInitializationEvent e) {
-        proxy.preInit(e);
+        modEventBus.addListener(this::addCreative);
     }
 
-    @EventHandler
-    public void init(FMLInitializationEvent e)
-    {
-        proxy.init(e);
-        // some example code
-        MinecraftForge.EVENT_BUS.register(this);
-
+    private void addCreative(BuildCreativeModeTabContentsEvent event) {
+        if (event.getTabKey() == CreativeModeTabs.REDSTONE_BLOCKS) {
+            event.accept(ModItems.SYNTHESIZER_ITEM.get());
+        }
     }
-
-    @EventHandler
-    public void postInit(FMLPostInitializationEvent e) {
-        proxy.postInit(e);
-    }
-
-//    @SubscribeEvent
-//    public void onPlayerTick(TickEvent.PlayerTickEvent tick)
-//    {
-//        FMLLog.getLogger().log(Level.INFO, "Player Tick");
-//    }
 }

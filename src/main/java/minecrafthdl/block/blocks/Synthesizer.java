@@ -1,149 +1,115 @@
 package minecrafthdl.block.blocks;
 
 import GraphBuilder.GraphBuilder;
-import minecrafthdl.MHDLException;
-import minecrafthdl.MinecraftHDL;
-import minecrafthdl.block.BasicBlock;
-import minecrafthdl.gui.MinecraftHDLGuiHandler;
+import com.mojang.logging.LogUtils;
+import minecrafthdl.client.ClientAccess;
 import minecrafthdl.synthesis.Circuit;
 import minecrafthdl.synthesis.IntermediateCircuit;
-import minecrafthdl.synthesis.LogicGates;
-import net.minecraft.block.Block;
-import net.minecraft.block.properties.PropertyBool;
-import net.minecraft.block.state.BlockStateContainer;
-import net.minecraft.block.state.IBlockState;
-import net.minecraft.client.Minecraft;
-import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.EnumFacing;
-import net.minecraft.util.EnumHand;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
-import org.omg.PortableInterceptor.SYSTEM_EXCEPTION;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
+import org.slf4j.Logger;
 
-import javax.annotation.Nullable;
-import java.io.IOException;
-import java.util.Random;
+public class Synthesizer extends Block {
+    public static final BooleanProperty TRIGGERED = BooleanProperty.create("triggered");
 
-/**
- * Created by Francis on 10/28/2016.
- */
-public class Synthesizer extends BasicBlock {
+    private static final Logger LOGGER = LogUtils.getLogger();
 
-    public static String file_to_gen;
-    public static int check_threshold = 100;
+    private static volatile String fileToGenerate;
 
-    public static final PropertyBool TRIGGERED = PropertyBool.create("triggered");
+    public Synthesizer() {
+        super(BlockBehaviour.Properties.of().mapColor(MapColor.STONE).strength(2.0f, 10.0f).sound(SoundType.STONE));
+        this.registerDefaultState(this.stateDefinition.any().setValue(TRIGGERED, Boolean.FALSE));
+    }
 
-    private int check_counter = 0;
-    private boolean to_check = false;
-    private Circuit c_check = null;
-    private BlockPos p_check = null;
+    public static void setFileToGenerate(String filePath) {
+        fileToGenerate = filePath;
+    }
 
-    public Synthesizer(String unlocalizedName) {
-        super(unlocalizedName);
-        this.setDefaultState(this.blockState.getBaseState().withProperty(TRIGGERED, false));
-        this.setTickRandomly(true);
-        System.out.println("hello");
+    public static String getFileToGenerate() {
+        return fileToGenerate;
     }
 
     @Override
-    public boolean onBlockActivated(World worldIn, BlockPos pos, IBlockState state, EntityPlayer playerIn, EnumHand hand, @Nullable ItemStack heldItem, EnumFacing side, float hitX, float hitY, float hitZ){
-        if (worldIn.isRemote){
-            playerIn.openGui(MinecraftHDL.instance, MinecraftHDLGuiHandler.SYNTHESISER_GUI_ID, worldIn, (int) playerIn.posX, (int) playerIn.posY, (int) playerIn.posZ);
+    public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
+        if (level.isClientSide) {
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> ClientAccess.openSynthesizerScreen(pos));
+        }
+        return InteractionResult.sidedSuccess(level.isClientSide);
+    }
+
+    @Override
+    public void neighborChanged(BlockState state, Level level, BlockPos pos, Block blockIn, BlockPos fromPos, boolean isMoving) {
+        if (level.isClientSide) {
+            return;
         }
 
-        return true;
+        boolean powered = isReceivingPower(level, pos);
+        boolean triggered = state.getValue(TRIGGERED);
+
+        if (!triggered && powered) {
+            level.setBlock(pos, state.setValue(TRIGGERED, Boolean.TRUE), Block.UPDATE_CLIENTS);
+
+            if (fileToGenerate != null && !fileToGenerate.isBlank()) {
+                synthGen(level, pos);
+            }
+        } else if (triggered && !powered) {
+            level.setBlock(pos, state.setValue(TRIGGERED, Boolean.FALSE), Block.UPDATE_CLIENTS);
+        }
+
+        level.updateNeighborsAt(pos, this);
     }
 
-    @SuppressWarnings("deprecation")
-    @Override
-    public void neighborChanged(IBlockState state, World worldIn, BlockPos pos, Block blockIn) {
-        if(!worldIn.isRemote) {
-            if(!state.getValue(TRIGGERED)){
-                if (worldIn.getRedstonePower(pos.north(), EnumFacing.NORTH) > 0) {
-                    //Negative Z is receiving power
-                    worldIn.setBlockState(pos, state.withProperty(TRIGGERED, true));
+    private static boolean isReceivingPower(Level level, BlockPos pos) {
+        for (Direction direction : Direction.values()) {
+            if (level.getSignal(pos.relative(direction), direction) > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
 
-                    if (Synthesizer.file_to_gen != null){
-                        synth_gen(worldIn, pos);
+    private void synthGen(Level level, BlockPos pos) {
+        try {
+            IntermediateCircuit intermediateCircuit = new IntermediateCircuit();
+            intermediateCircuit.loadGraph(GraphBuilder.buildGraph(fileToGenerate));
+            intermediateCircuit.buildGates();
+            intermediateCircuit.routeChannels();
 
+            Circuit circuit = intermediateCircuit.genCircuit();
+            circuit.placeInWorld(level, pos, Direction.NORTH);
+        } catch (Exception e) {
+            LOGGER.error("Failed to generate circuit from {}", fileToGenerate, e);
+
+            if (level instanceof ServerLevel serverLevel) {
+                for (ServerPlayer nearby : serverLevel.players()) {
+                    if (nearby.blockPosition().closerThan(pos, 64.0d)) {
+                        nearby.displayClientMessage(Component.literal("MinecraftHDL: generation failed, check logs").withStyle(ChatFormatting.RED), false);
                     }
-                }else if (worldIn.getRedstonePower(pos.east(), EnumFacing.EAST) > 0) {
-                    //Negative X is receiving power
-                    worldIn.setBlockState(pos, state.withProperty(TRIGGERED, true));
-
-                    if (Synthesizer.file_to_gen != null){
-                        synth_gen(worldIn, pos);
-
-                    }
-
-                }else if (worldIn.getRedstonePower(pos.south(), EnumFacing.SOUTH) > 0) {
-                    //Positive Z is receiving power
-                    worldIn.setBlockState(pos, state.withProperty(TRIGGERED, true));
-
-                    if (Synthesizer.file_to_gen != null){
-                        synth_gen(worldIn, pos);
-
-                    }
-                }else if (worldIn.getRedstonePower(pos.west(), EnumFacing.WEST) > 0) {
-                    //Positive X is receiving power
-                    worldIn.setBlockState(pos, state.withProperty(TRIGGERED, true));
-
-                    if (Synthesizer.file_to_gen != null){
-                        synth_gen(worldIn, pos);
-                    }
-                }else if (worldIn.getRedstonePower(pos.up(), EnumFacing.UP) > 0) {
-                    //Positive Y is receiving power
-                    worldIn.setBlockState(pos, state.withProperty(TRIGGERED, true));
-                    LogicGates.XOR().placeInWorld(worldIn, pos, EnumFacing.NORTH);
-                }else if (worldIn.getRedstonePower(pos.down(), EnumFacing.DOWN) > 0) {
-                    //Negative Y is receiving power
-                } else {
-                    worldIn.setBlockState(pos, state.withProperty(TRIGGERED, false));
-                }
-            } else {
-                if (!worldIn.isBlockPowered(pos)) {
-                    worldIn.setBlockState(pos, state.withProperty(TRIGGERED, false));
                 }
             }
-
-            worldIn.notifyNeighborsOfStateChange(pos, this);
-        }
-    }
-
-    private void synth_gen(World worldIn, BlockPos pos){
-        try {
-
-            IntermediateCircuit ic = new IntermediateCircuit();
-            ic.loadGraph(GraphBuilder.buildGraph(Synthesizer.file_to_gen));
-            ic.buildGates();
-            ic.routeChannels();
-            this.c_check = ic.genCircuit();
-            c_check.placeInWorld(worldIn, pos, EnumFacing.NORTH);
-            this.to_check = true;
-            this.p_check = pos;
-
-        } catch (Exception e){
-            Minecraft.getMinecraft().thePlayer.sendChatMessage("An error occurred while generating the circuit, check the logs! Sorry!");
-            e.printStackTrace();
         }
     }
 
     @Override
-    protected BlockStateContainer createBlockState()
-    {
-        return new BlockStateContainer(this, TRIGGERED);
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
+        builder.add(TRIGGERED);
     }
-
-    @Override
-    public IBlockState getStateFromMeta(int meta) {
-        return this.getDefaultState().withProperty(TRIGGERED, (meta) > 0);
-    }
-
-    @Override
-    public int getMetaFromState(IBlockState state) {
-        return state.getValue(TRIGGERED) ? 1 : 0;
-    }
-
 }
