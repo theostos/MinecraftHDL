@@ -1,6 +1,13 @@
 package minecrafthdl.synthesis.prefab;
 
 import minecrafthdl.synthesis.Gate;
+import minecrafthdl.synthesis.prefab.builders.McCounterPrefabBuilder;
+import minecrafthdl.synthesis.prefab.builders.McLatchPrefabBuilder;
+import minecrafthdl.synthesis.prefab.builders.McPeriodicPrefabBuilder;
+import minecrafthdl.synthesis.prefab.builders.McSeqLockPrefabBuilder;
+import minecrafthdl.synthesis.prefab.builders.McStationFsmPrefabBuilder;
+import minecrafthdl.synthesis.prefab.builders.McTimerPrefabBuilder;
+import minecrafthdl.synthesis.prefab.builders.PrefabMacroBuilder;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -10,6 +17,17 @@ import java.util.Map;
  * Runtime path remains fallback while prefab implementations are rolled out.
  */
 public final class PrefabMacroGateFactory {
+
+    private static final LinkedHashMap<String, PrefabMacroBuilder> BUILDERS = new LinkedHashMap<String, PrefabMacroBuilder>();
+
+    static {
+        BUILDERS.put("mc_timer", new McTimerPrefabBuilder());
+        BUILDERS.put("mc_periodic", new McPeriodicPrefabBuilder());
+        BUILDERS.put("mc_latch", new McLatchPrefabBuilder());
+        BUILDERS.put("mc_counter", new McCounterPrefabBuilder());
+        BUILDERS.put("mc_seq_lock", new McSeqLockPrefabBuilder());
+        BUILDERS.put("mc_station_fsm", new McStationFsmPrefabBuilder());
+    }
 
     public static final class Request {
         public final String instanceName;
@@ -43,8 +61,10 @@ public final class PrefabMacroGateFactory {
         if (request == null || request.macroName == null) {
             return null;
         }
-        // Placeholder for true-prefab builders per macro.
-        // Returning null keeps runtime fallback active during migration.
-        return null;
+        PrefabMacroBuilder builder = BUILDERS.get(request.macroName);
+        if (builder == null) {
+            return null;
+        }
+        return builder.build(request);
     }
 }
