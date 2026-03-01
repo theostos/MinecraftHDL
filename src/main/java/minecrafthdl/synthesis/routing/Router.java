@@ -56,6 +56,8 @@ public class Router {
             GatePins gate_pins = null;
             if (v.type == VertexType.FUNCTION && ((Function)v).func_type == FunctionType.MUX){
                 gate_pins = new MuxPins(bottom_gates.get(i), bottom_vertices.get(i), bottom_offset, false);
+            } else if (v.type == VertexType.FUNCTION && isMacroType(((Function) v).func_type)) {
+                gate_pins = new MacroPins(bottom_gates.get(i), bottom_vertices.get(i), bottom_offset, false);
             } else {
                 gate_pins = new GatePins(bottom_gates.get(i), bottom_vertices.get(i), bottom_offset, false);
             }
@@ -88,6 +90,15 @@ public class Router {
         return rtn;
     }
 
+    private static boolean isMacroType(FunctionType type) {
+        return type == FunctionType.MC_TIMER
+                || type == FunctionType.MC_PERIODIC
+                || type == FunctionType.MC_LATCH
+                || type == FunctionType.MC_COUNTER
+                || type == FunctionType.MC_SEQ_LOCK
+                || type == FunctionType.MC_STATION_FSM;
+    }
+
     public static HashMap<Integer, Net> initializeNets(ArrayList<Vertex> top_vertices, ArrayList<Vertex> bottom_vertices, HashMap<Vertex, GatePins> pin_map) {
         HashMap<Integer, Net> nets = new HashMap<Integer, Net>();
 
@@ -108,20 +119,15 @@ public class Router {
             }
         }
 
+        // Bottom vertices in this channel are sinks only.
+        // Any remaining free input pin indicates an unsupported dependency.
         for (Vertex v : bottom_vertices){
             GatePins gate = pin_map.get(v);
-
-            while (gate.hasNextPin()){
-                Pin next_pin = gate.getNextPin(v);
-                if (next_pin.empty() || next_pin.hasNet()) continue;
-
-                Net net = new Net();
-                nets.put(net.id, net);
-                net.addPin(next_pin, false);
-
-                for (Vertex next_vertex : v.getNext()){
-                    net.addPin(pin_map.get(next_vertex).getNextPin(v), false);
-                }
+            if (gate.hasNextPin()) {
+                throw new RuntimeException(
+                        "Unroutable channel dependency for vertex " + v.getID()
+                                + ": gate still has unassigned input pins after top-to-bottom net assignment."
+                );
             }
         }
 

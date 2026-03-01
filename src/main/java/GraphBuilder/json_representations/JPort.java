@@ -9,24 +9,24 @@ import java.util.ArrayList;
 public class JPort extends Node {
     public String name;
     public String direction;
-    public ArrayList<Integer> bits;
+    public ArrayList<Object> bits;
 
-    public JPort(String name, String direction, ArrayList<Integer> bits) {
+    public JPort(String name, String direction, ArrayList<Object> bits) {
         this.name = name;
         this.direction = direction;
         this.bits = bits;
     }
 
     @Override
-    public ArrayList<Integer> getNets() {
+    public ArrayList<Object> getNets() {
         return null;
     }
 
     public void print(int tabs) {
         System.out.println(JsonFile.tabs(tabs) + "direction: " + direction);
         System.out.println(JsonFile.tabs(tabs) + "bits:");
-        for(int i : bits){
-            System.out.println(JsonFile.tabs(tabs + 1) + i);
+        for (Object bit : bits) {
+            System.out.println(JsonFile.tabs(tabs + 1) + bit);
 
         }
 

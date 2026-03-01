@@ -85,7 +85,30 @@ MinecraftHDL was the final undergraduate design project made by three students i
  
 It is by no means bug-free or even complete; It produces objectively inferior circuits to 'hand-made' redstone designs, and is not intended to be used in modded survival. It can generate almost any verilog circuit, however only simple designs will actually be testable in-game since any moderately-complex design will end up being longer than the maximum number of blocks loaded in Minecraft. 
 
-Additionally, we are currently unable to synthesize sequential circuits, aka any circuits with a loopback or feedback. That means no memory, no counters or any circuit that could hold a state.
+Sequential support is intentionally limited to a whitelisted macro subset. Arbitrary feedback/loopback synthesis is still rejected.
+Supported macro modules are:
+- `mc_timer`
+- `mc_periodic`
+- `mc_latch`
+- `mc_counter`
+- `mc_seq_lock`
+- `mc_station_fsm`
+
+Macro behavior contract is documented in:
+- `markdown/PREFAB_MACRO_SPEC.md`
+
+Cycle-accurate macro simulation (without launching Minecraft) is covered by tests in:
+- `src/test/java/minecrafthdl/simulation/prefab/`
+  - `PrefabMacroSpecVectorsTest`
+  - `PrefabMacroModelTest`
+  - `Example6AcceptanceTest`
+
+Prefab-macro options are available through Forge common config:
+- `prefabMacros.autoClockPeriodTicks` (default `2`)
+- `prefabMacros.totalBlockBudget` (default `10000`)
+- `prefabMacros.perInstanceBlockBudget` (default `2000`)
+
+Macro synthesis now uses prefab gate generation for all whitelisted `mc_*` modules.
  
 MinecraftHDL is an educational tool to illustrate on a macro-scopic scale how microelectronic digital circuits are designed and produced. It is a great way to introduce younger audiences to the world of digital design and can also be used to illustrate the difference between software and hardware design to undergraduate engineers taking their first RTL class.
 

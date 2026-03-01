@@ -45,3 +45,19 @@ Output file:
 ```
 
 Produced jars are under `build/libs/`.
+
+## 6. Prefab Macro Config (Optional)
+
+When running in dev mode, Forge common config is generated under:
+
+- `run/config/minecrafthdl-common.toml`
+
+Macro-related keys:
+
+- `prefabMacros.autoClockPeriodTicks=2`
+- `prefabMacros.totalBlockBudget=10000`
+- `prefabMacros.perInstanceBlockBudget=2000`
+
+Macro behavior contract is defined in:
+
+- `markdown/PREFAB_MACRO_SPEC.md`

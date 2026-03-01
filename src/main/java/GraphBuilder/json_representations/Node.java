@@ -8,7 +8,7 @@ import java.util.ArrayList;
 
 abstract public class Node {
 
-    abstract public ArrayList<Integer> getNets();
+    abstract public ArrayList<Object> getNets();
 
 
 }

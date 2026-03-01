@@ -1,6 +1,6 @@
 package GraphBuilder.json_representations;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 
 /**
  * Created by Francis O'Brien - 4/3/2017 - 19:47
@@ -8,8 +8,9 @@ import java.util.HashMap;
 
 public class Module {
 
-    public HashMap<String, JPort> ports;
-    public HashMap<String, JCell> cells;
+    public LinkedHashMap<String, String> attributes;
+    public LinkedHashMap<String, JPort> ports;
+    public LinkedHashMap<String, JCell> cells;
 
     public void print() {
         System.out.println("PORTS:");

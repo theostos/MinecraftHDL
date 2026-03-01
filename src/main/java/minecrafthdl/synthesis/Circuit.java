@@ -1,14 +1,19 @@
 package minecrafthdl.synthesis;
 
+import net.minecraft.network.chat.Component;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.entity.SignText;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class Circuit {
@@ -16,6 +21,67 @@ public class Circuit {
     public static boolean TEST = false;
 
     private final ArrayList<ArrayList<ArrayList<BlockState>>> blocks;
+    private final ArrayList<MacroPlacement> macroPlacements = new ArrayList<MacroPlacement>();
+    private final ArrayList<SignPlacement> signPlacements = new ArrayList<SignPlacement>();
+
+    public static final class SignPlacement {
+        public final int x;
+        public final int y;
+        public final int z;
+        public final String text;
+
+        public SignPlacement(int x, int y, int z, String text) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.text = text;
+        }
+
+        public SignPlacement offsetBy(int dx, int dy, int dz) {
+            return new SignPlacement(this.x + dx, this.y + dy, this.z + dz, this.text);
+        }
+    }
+
+    public static final class MacroPlacement {
+        public final int x;
+        public final int y;
+        public final int z;
+        public final String instanceName;
+        public final String macroName;
+        public final String outputPort;
+        public final int outputBit;
+        public final int inputCount;
+        public final int inputStride;
+        public final LinkedHashMap<String, Long> params;
+
+        public MacroPlacement(int x, int y, int z, String instanceName, String macroName, String outputPort, int outputBit, int inputCount, int inputStride, Map<String, Long> params) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.instanceName = instanceName == null ? "" : instanceName;
+            this.macroName = macroName;
+            this.outputPort = outputPort;
+            this.outputBit = outputBit;
+            this.inputCount = inputCount;
+            this.inputStride = inputStride;
+            this.params = new LinkedHashMap<String, Long>(params);
+        }
+
+        public MacroPlacement offsetBy(int dx, int dy, int dz) {
+            return new MacroPlacement(
+                    this.x + dx,
+                    this.y + dy,
+                    this.z + dz,
+                    this.instanceName,
+                    this.macroName,
+                    this.outputPort,
+                    this.outputBit,
+                    this.inputCount,
+                    this.inputStride,
+                    this.params
+            );
+        }
+    }
 
     public static final class Placement {
         private final BlockPos origin;
@@ -137,6 +203,22 @@ public class Circuit {
             );
             level.setBlockAndUpdate(blockPos, entry.getValue());
         }
+
+        for (SignPlacement signPlacement : this.signPlacements) {
+            BlockPos blockPos = new BlockPos(startX + signPlacement.x, startY + signPlacement.y, startZ + signPlacement.z);
+            if (!(level.getBlockEntity(blockPos) instanceof SignBlockEntity sign)) {
+                continue;
+            }
+
+            SignText front = sign.getFrontText().setMessage(0, Component.literal(signPlacement.text));
+            SignText back = sign.getBackText().setMessage(0, Component.literal(signPlacement.text));
+            sign.setText(front, true);
+            sign.setText(back, false);
+            sign.setChanged();
+
+            BlockState state = level.getBlockState(blockPos);
+            level.sendBlockUpdated(blockPos, state, state, Block.UPDATE_CLIENTS);
+        }
     }
 
     public int getSizeX() {
@@ -163,5 +245,48 @@ public class Circuit {
                 }
             }
         }
+
+        for (MacroPlacement placement : circuit.macroPlacements) {
+            this.macroPlacements.add(placement.offsetBy(xOffset, yOffset, zOffset));
+        }
+        for (SignPlacement placement : circuit.signPlacements) {
+            this.signPlacements.add(placement.offsetBy(xOffset, yOffset, zOffset));
+        }
+    }
+
+    public void addMacroPlacement(MacroPlacement placement) {
+        this.macroPlacements.add(placement);
+    }
+
+    public void addSignPlacement(SignPlacement placement) {
+        this.signPlacements.add(placement);
+    }
+
+    public int getSignPlacementCount() {
+        return this.signPlacements.size();
+    }
+
+    public ArrayList<SignPlacement> getSignPlacementsSnapshot() {
+        return new ArrayList<SignPlacement>(this.signPlacements);
+    }
+
+    public int getMacroPlacementCount() {
+        return this.macroPlacements.size();
+    }
+
+    public ArrayList<MacroPlacement> getMacroPlacementsSnapshot() {
+        return new ArrayList<MacroPlacement>(this.macroPlacements);
+    }
+
+    public boolean hasSignPlacementText(String text) {
+        if (text == null) {
+            return false;
+        }
+        for (SignPlacement placement : this.signPlacements) {
+            if (text.equals(placement.text)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
