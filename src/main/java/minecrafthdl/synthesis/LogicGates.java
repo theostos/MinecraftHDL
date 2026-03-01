@@ -6,6 +6,8 @@ import minecrafthdl.Utils;
 import minecrafthdl.synthesis.prefab.PrefabMacroGateFactory;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LeverBlock;
+import net.minecraft.world.level.block.state.properties.AttachFace;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,13 +21,16 @@ public class LogicGates {
     }
 
     public static Gate Input(String id) {
-        Gate gate = new Gate(1, 2, 1, 1, 1, 0, 0, new int[]{0});
+        Gate gate = new Gate(1, 3, 1, 1, 1, 0, 0, new int[]{0});
         gate.is_io = true;
 
         gate.setBlock(0, 0, 0, Blocks.WHITE_WOOL.defaultBlockState());
+        gate.setBlock(0, 1, 0, Blocks.LEVER.defaultBlockState()
+                .setValue(LeverBlock.FACE, AttachFace.FLOOR)
+                .setValue(LeverBlock.FACING, Direction.NORTH));
         if (id != null && !id.isBlank()) {
-            gate.setBlock(0, 1, 0, Utils.standingSignRotation(8));
-            gate.addSignPlacement(new Circuit.SignPlacement(0, 1, 0, id));
+            gate.setBlock(0, 2, 0, Utils.standingSignRotation(8));
+            gate.addSignPlacement(new Circuit.SignPlacement(0, 2, 0, id));
         }
         return gate;
     }
