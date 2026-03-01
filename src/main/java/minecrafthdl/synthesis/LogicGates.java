@@ -45,8 +45,10 @@ public class LogicGates {
 
     public static Gate Output(String id) {
         if (isDoorOutput(id)) {
-            // Iron door: lower at y=0 (receives redstone from routing), upper at y=1, sign at y=2
-            Gate gate = new Gate(1, 3, 1, 1, 1, 0, 0, new int[]{0});
+            // Iron door: lower at y=0 (receives redstone), upper at y=1.
+            // No sign: iron door upper is not face-sturdy so a standing sign above it pops.
+            // Placement is deferred in Circuit.placeInWorld to avoid the lower-half-pops issue.
+            Gate gate = new Gate(1, 2, 1, 1, 1, 0, 0, new int[]{0});
             gate.is_io = true;
             gate.setBlock(0, 0, 0, Blocks.IRON_DOOR.defaultBlockState()
                     .setValue(DoorBlock.HALF, DoubleBlockHalf.LOWER)
@@ -60,10 +62,6 @@ public class LogicGates {
                     .setValue(DoorBlock.HINGE, DoorHingeSide.LEFT)
                     .setValue(DoorBlock.OPEN, false)
                     .setValue(DoorBlock.POWERED, false));
-            if (id != null && !id.isBlank()) {
-                gate.setBlock(0, 2, 0, Utils.standingSignRotation(0));
-                gate.addSignPlacement(new Circuit.SignPlacement(0, 2, 0, id));
-            }
             return gate;
         }
 

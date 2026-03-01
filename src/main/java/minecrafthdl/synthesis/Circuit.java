@@ -179,6 +179,7 @@ public class Circuit {
         }
 
         HashMap<Vec3i, BlockState> torches = new HashMap<>();
+        HashMap<Vec3i, BlockState> doors = new HashMap<>();
 
         for (int i = 0; i < width; i++) {
             for (int j = 0; j < height; j++) {
@@ -187,6 +188,10 @@ public class Circuit {
 
                     if (state.is(Blocks.REDSTONE_TORCH) || state.is(Blocks.REDSTONE_WALL_TORCH)) {
                         torches.put(new Vec3i(i, j, k), state);
+                    } else if (state.is(Blocks.IRON_DOOR)) {
+                        // Defer door halves: placed last without physics so both halves
+                        // co-exist before any neighbour update can invalidate them.
+                        doors.put(new Vec3i(i, j, k), state);
                     } else {
                         BlockPos blockPos = new BlockPos(startX + i, startY + j, startZ + k);
                         level.setBlockAndUpdate(blockPos, state);
@@ -202,6 +207,17 @@ public class Circuit {
                     startZ + entry.getKey().getZ()
             );
             level.setBlockAndUpdate(blockPos, entry.getValue());
+        }
+
+        // Place door halves without triggering block validation (UPDATE_CLIENTS only).
+        // Both halves are set before any neighbour update reaches them, so neither pops.
+        for (Map.Entry<Vec3i, BlockState> entry : doors.entrySet()) {
+            BlockPos blockPos = new BlockPos(
+                    startX + entry.getKey().getX(),
+                    startY + entry.getKey().getY(),
+                    startZ + entry.getKey().getZ()
+            );
+            level.setBlock(blockPos, entry.getValue(), Block.UPDATE_CLIENTS);
         }
 
         for (SignPlacement signPlacement : this.signPlacements) {
