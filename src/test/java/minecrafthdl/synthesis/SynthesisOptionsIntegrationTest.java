@@ -17,8 +17,8 @@ class SynthesisOptionsIntegrationTest {
     void defaultsExposeExpectedContractValues() {
         SynthesisOptions defaults = SynthesisOptions.defaults();
         assertEquals(2, defaults.prefabAutoClockPeriodTicks());
-        assertEquals(10000, defaults.prefabMacroTotalBlockBudget());
-        assertEquals(2000, defaults.prefabMacroPerInstanceBlockBudget());
+        assertEquals(100000, defaults.prefabMacroTotalBlockBudget());
+        assertEquals(10000, defaults.prefabMacroPerInstanceBlockBudget());
     }
 
     @Test

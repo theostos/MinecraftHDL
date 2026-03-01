@@ -19,11 +19,11 @@ public final class MHDLCommonConfig {
 
         PREFAB_MACRO_TOTAL_BLOCK_BUDGET = builder
                 .comment("Hard synthesis block budget (total circuit volume estimate) when prefab macros are enabled.")
-                .defineInRange("totalBlockBudget", 10000, 100, 200000);
+                .defineInRange("totalBlockBudget", 100000, 100, 200000);
 
         PREFAB_MACRO_PER_INSTANCE_BLOCK_BUDGET = builder
                 .comment("Hard synthesis block budget per macro instance when prefab macros are enabled.")
-                .defineInRange("perInstanceBlockBudget", 2000, 50, 50000);
+                .defineInRange("perInstanceBlockBudget", 10000, 50, 50000);
 
         builder.pop();
         SPEC = builder.build();
